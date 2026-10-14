@@ -2,47 +2,74 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/api.js";
 import { useAuth } from "../api/AuthContext.jsx";
+import { LOCALES, useLanguage } from "../api/LanguageContext.jsx";
 
 export default function Dashboard() {
   const { usuario } = useAuth();
+  const { language, t } = useLanguage();
   const [indicadores, setIndicadores] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .obtenerIndicadores()
-      .then(setIndicadores)
-      .catch((err) => setError(err.message));
+    async function cargarIndicadores() {
+      try {
+        const datos = await api.obtenerIndicadores();
+        setIndicadores(datos);
+        setError("");
+      } catch (err) {
+        setError(err.message);
+      }
+    }
+
+    cargarIndicadores();
+    const intervalo = window.setInterval(cargarIndicadores, 30 * 60 * 1000);
+    return () => window.clearInterval(intervalo);
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
-      <h2 className="text-2xl font-semibold">Hola, {usuario.nombre}</h2>
-      <p className="mt-1 text-lg text-acero-claro">
-        Este es tu panel para cotizar importaciones de productos metalúrgicos.
-      </p>
+    <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="dashboard-shell">
+        <div className="dashboard-hero">
+          <div>
+            <p className="dashboard-kicker">{t("Cotizador CINTAC")}</p>
+            <h2 className="dashboard-title">{t("Hola, {name}", { name: usuario.nombre })}</h2>
+          </div>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
-        <div className="tarjeta">
-          <h3 className="text-lg">Dólar observado hoy</h3>
-          {error && <p className="mt-2 text-peligro">{error}</p>}
-          {!error && !indicadores && <p className="mt-2 text-acero-claro">Cargando...</p>}
-          {indicadores && (
-            <p className="mt-2 text-3xl font-display font-semibold text-acero">
-              ${indicadores.dolarObservado.valor.toLocaleString("es-CL")}
-              <span className="ml-2 text-base font-body font-normal text-acero-claro">CLP</span>
-            </p>
-          )}
-          <p className="mt-2 text-sm text-acero-claro">Fuente: Banco Central (mindicador.cl)</p>
+          <div className="dashboard-actions">
+            <Link to="/nueva" className="btn-primario hero-btn">
+              {t("Nueva cotización")}
+            </Link>
+            <Link to="/historial" className="btn-secundario hero-btn">
+              {t("Ver historial")}
+            </Link>
+          </div>
         </div>
 
-        <div className="tarjeta flex flex-col justify-center gap-3">
-          <Link to="/nueva" className="btn-primario">
-            Registrar nueva cotización
-          </Link>
-          <Link to="/historial" className="btn-secundario">
-            Ver historial de cotizaciones
-          </Link>
+        <div className="summary-grid">
+          <div className="summary-card summary-card--accent">
+            <span className="summary-label">{t("Dólar observado")}</span>
+            {error && <p className="summary-error">{t(error)}</p>}
+            {!error && !indicadores && <p className="summary-loading">{t("Cargando...")}</p>}
+            {indicadores && (
+              <p className="summary-value">
+                ${indicadores.dolarObservado.valor.toLocaleString(LOCALES[language])}
+                <span>CLP</span>
+              </p>
+            )}
+            <small>{t("Fuente: Banco Central")}</small>
+          </div>
+
+          <div className="summary-card summary-card--dark">
+            <span className="summary-label">{t("Cotizaciones")}</span>
+            <h3>{t("Rápidas")}</h3>
+            <p>{t("Genera un cálculo operativo en pocos segundos.")}</p>
+          </div>
+
+          <div className="summary-card summary-card--dark">
+            <span className="summary-label">{t("Control")}</span>
+            <h3>{t("Visual")}</h3>
+            <p>{t("Revisa historial, compara y toma decisiones.")}</p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,91 +1,104 @@
 # Cotizador de Importaciones — Cintac
 
-Prototipo funcional del cotizador interno de importación de productos
-metalúrgicos descrito en el informe "Proyecto Integrado". Backend en
-Node/Express + MongoDB, frontend en React/Vite, tipo de cambio real
-desde la API oficial chilena [mindicador.cl](https://mindicador.cl) (Banco Central,
-sin necesidad de API key).
+Cotizador web del flete de importación marítima para el área de Comercio Exterior
+(Comex) de Cintac. Frontend React + Vite, backend Node/Express y base de datos
+PostgreSQL en **Neon**, desplegado en **Vercel**.
 
-## Qué implementa cada parte del informe
+## Qué hace
 
-| Historia de usuario | Dónde está |
-|---|---|
-| HDU-01 Registrar cotización | `POST /api/cotizaciones` — página "Nueva cotización" |
-| HDU-02 Cálculo automático | `POST /api/cotizaciones/:id/calcular` (usa `utils/calculoCosto.js` + `utils/tipoCambio.js`) |
-| HDU-03 Comparar cotizaciones | `GET /api/cotizaciones/comparar` — página "Comparar" |
-| HDU-04 Historial | `GET /api/cotizaciones` — página "Historial" |
-| HDU-05 Exportar PDF | `utils/exportPdf.js` (jsPDF, en el frontend) |
-| HDU-06 Perfiles y accesos | JWT + roles (`analista`, `jefe_abastecimiento`, `administrador`) — página "Usuarios" |
+- Calcula los contenedores a partir del peso (tope de **25 t** por contenedor, editable).
+- Compara el flete y el tránsito de los embarcadores de una ruta y marca el más
+  económico y el más rápido.
+- Calcula el costo de internación con las reglas de Comex:
+  CIF = FOB + flete (sin seguro) · arancel parametrizable (0 % por TLC) ·
+  IVA 19 % sobre CIF + arancel · costos locales opcionales · conversión a CLP con
+  el dólar observado (mindicador.cl, con respaldo del último valor guardado).
+- Suma el margen de contingencia en días al tránsito.
+- **Tarifas**: Comex edita tarifas, embarcadores y parámetros sin tocar el código;
+  cada cambio queda con usuario y fecha y en la auditoría.
+- Exporta la cotización a PDF, Excel (CSV) o Word con el desglose completo.
 
-## 1. Requisitos previos
+## Estructura
 
-- Node.js 18 o superior
-- Una cuenta gratuita de [MongoDB Atlas](https://www.mongodb.com/atlas) (igual que en pelu-xing)
-- Una cuenta de [Vercel](https://vercel.com) para el despliegue
+```
+backend/
+  config/db.js          conexión a Postgres + creación automática de tablas
+  config/store.js       consultas SQL (capa de acceso a datos)
+  db/schema.js          esquema (fuente única) · db/schema.sql es una copia para el informe
+  db/datosIniciales.js  puertos, rutas, tarifas referenciales y parámetros iniciales
+  utils/calculoCosto.js motor de cálculo (funciones puras)
+  tests/                pruebas del motor de cálculo (npm test)
+frontend/
+  src/pages/            Login, Inicio, Nueva cotización, Historial, Comparar, Tarifas, Admin
+vercel.json             despliega backend (/api) y frontend en un solo proyecto
+```
 
-## 2. Backend
+## Base de datos
+
+Diez tablas en tercera forma normal: `usuarios`, `embarcadores`, `puertos`, `rutas`,
+`tarifas`, `parametros`, `cotizaciones`, `auditoria`, `aprobaciones_rol` y
+`tipo_cambio`. **No hay que crearlas a mano**: el backend las crea y carga los datos
+iniciales la primera vez que recibe una petición (o con `npm run db:setup`).
+Si las tablas ya existen, no hace nada.
+
+## Despliegue en Vercel con Neon (paso a paso)
+
+1. **Subir el código a tu GitHub.** Crea un repositorio vacío (por ejemplo
+   `cintac-cotizador`) y sube esta carpeta:
+   ```bash
+   git init            # solo si la carpeta no trae .git
+   git add .
+   git commit -m "Persistencia en PostgreSQL (Neon), cálculo según Comex y mantenedor de tarifas"
+   git branch -M main
+   git remote add origin https://github.com/TU_USUARIO/cintac-cotizador.git
+   git push -u origin main
+   ```
+   Si la carpeta ya trae `.git` (historial de Giovanni), cambia el remoto con
+   `git remote set-url origin https://github.com/TU_USUARIO/cintac-cotizador.git`.
+2. **Importar en Vercel.** vercel.com → *Add New… → Project* → elige el repositorio →
+   deja *Root Directory* en la raíz (donde está `vercel.json`) → *Deploy*.
+   El primer despliegue fallará en `/api` porque aún no hay base de datos: es normal.
+3. **Crear la base en Neon.** En el proyecto de Vercel: *Storage → Create Database →
+   Neon (Serverless Postgres)* → plan **Free** → región más cercana (São Paulo si
+   aparece, si no `us-east-1`) → *Connect Project* marcando Production, Preview y
+   Development. Vercel crea sola la variable `DATABASE_URL`.
+4. **Variables de entorno.** *Settings → Environment Variables*, agrega:
+   | Variable | Valor |
+   | --- | --- |
+   | `JWT_SECRET` | 48+ caracteres aleatorios (ver `backend/.env.example`) |
+   | `ADMIN_INITIAL_PASSWORD` | contraseña de `Cintac_Admin`, 12+ caracteres con letras y números |
+   | `CORS_ORIGIN` | la URL del proyecto, por ejemplo `https://cintac-cotizador.vercel.app` |
+5. **Redeploy.** *Deployments → … → Redeploy*. Abre la URL, entra con `Cintac_Admin`
+   y la contraseña del paso 4. En ese primer acceso se crean las tablas.
+6. **Revisar los datos.** En Vercel *Storage → (tu base) → Open in Neon → Tables*
+   o *SQL Editor* (`SELECT * FROM tarifas;`).
+
+Nunca subas `backend/.env` ni la carpeta `.vercel` al repositorio ni a un zip:
+`.gitignore` ya los excluye.
+
+## Trabajar en local
+
+Requisitos: Node 22.
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-```
+cp .env.example .env      # pega DATABASE_URL de Neon, JWT_SECRET y ADMIN_INITIAL_PASSWORD
+npm run db:setup          # crea tablas y datos iniciales (opcional: también ocurre solo)
+npm test                  # 10 pruebas del motor de cálculo
+npm run dev               # http://localhost:4000
 
-Edita `.env` y completa `MONGODB_URI` con tu cadena de conexión de Atlas,
-y `JWT_SECRET` con cualquier texto largo aleatorio.
-
-```bash
-npm run dev
-```
-
-El servidor queda en `http://localhost:4000`.
-
-### Crear el primer usuario administrador
-
-No hay una cuenta por defecto. Crea el primer usuario administrador con:
-
-```bash
-curl -X POST http://localhost:4000/api/usuarios/registro \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"Tu Nombre","email":"tu@cintac.cl","password":"unaClaveSegura","rol":"administrador"}'
-```
-
-**Importante (seguridad):** el endpoint de registro deja elegir el rol libremente,
-lo cual sirve para crear este primer administrador rápido, pero antes de usar el
-sistema con datos reales conviene restringir `rol: "administrador"` para que solo
-el propio administrador pueda asignarlo (por ejemplo, quitando el campo `rol` del
-registro público y dejando que solo se asigne desde la pantalla de Usuarios).
-Las contraseñas ya se guardan cifradas con bcrypt — a diferencia de lo que quedó
-pendiente en pelu-xing.
-
-## 3. Frontend
-
-```bash
-cd frontend
+cd ../frontend
 npm install
-cp .env.example .env
-npm run dev
+npm run dev               # http://localhost:5173/frontend/
 ```
 
-Abre `http://localhost:5173` e inicia sesión con el usuario que creaste.
+Tip: con la CLI de Vercel (`npm i -g vercel`, `vercel link`, `vercel env pull backend/.env`)
+se descargan las mismas variables del proyecto.
 
-## 4. Desplegar en Vercel
+## Pendiente de confirmar con Comex
 
-**Backend:**
-1. Sube la carpeta `backend/` como un proyecto nuevo en Vercel (puede ser un repo
-   separado o un monorepo con "Root Directory" apuntando a `backend`).
-2. En Vercel, agrega las variables de entorno `MONGODB_URI`, `JWT_SECRET` y
-   `CORS_ORIGIN` (esta última con la URL final del frontend).
-
-**Frontend:**
-1. Sube la carpeta `frontend/` como otro proyecto en Vercel.
-2. Agrega la variable de entorno `VITE_API_URL` apuntando a la URL del backend
-   ya desplegado, seguida de `/api` (ej: `https://tu-backend.vercel.app/api`).
-
-## 5. Sobre los datos de aranceles
-
-Los porcentajes de arancel en `backend/utils/aranceles.js` son valores de
-ejemplo para que el cálculo funcione en el prototipo. Para producción deben
-actualizarse con el Arancel Aduanero vigente del Servicio Nacional de Aduanas,
-considerando acuerdos comerciales por país de origen — esto quedó identificado
-como pendiente de "actualización manual" en la priorización del informe (sección 2.4).
+- Los tres embarcadores reales y su tarifa por ruta (hoy los tres tienen la misma
+  tarifa referencial de la planilla). Se cargan desde **Tarifas**.
+- El margen de contingencia por defecto (hoy 0 días).
+- Cómo tratar la carga que no viaja en contenedor.
