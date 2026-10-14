@@ -12,27 +12,44 @@ function descargarBlob(contenido, nombreArchivo, tipo) {
   URL.revokeObjectURL(url);
 }
 
-function obtenerFilasCotizacion(cotizacion) {
+const usd = (n) => (n === undefined || n === null ? "-" : `US$ ${Number(n).toLocaleString("es-CL", { maximumFractionDigits: 2 })}`);
+const clp = (n) => (n === undefined || n === null ? "-" : `$${Number(n).toLocaleString("es-CL")} CLP`);
+const pct = (n) => (n === undefined || n === null ? "-" : `${(Number(n) * 100).toFixed(1)} %`);
+const rango = (a, b, fmt) => (a === undefined || a === null ? "-" : `${fmt(a)} – ${fmt(b)}`);
+
+// Una sola lista de filas para PDF, Excel (CSV) y Word, con el desglose que pide
+// la HDU-08: ruta, embarcador, contenedores, costos, tipo de cambio, fecha y usuario.
+function obtenerFilasCotizacion(c) {
   return [
-    ["Proveedor", cotizacion.proveedor || "-"],
-    ["Producto", cotizacion.producto || "-"],
-    ["Tipo de producto", cotizacion.tipoProducto || "-"],
-    ["País de origen", cotizacion.paisOrigen || "-"],
-    ["Cantidad", cotizacion.cantidad ?? "-"],
-    ["Precio FOB unitario", `${cotizacion.precioFOB ?? "-"} ${cotizacion.moneda || "USD"}`],
-    ["Flete", cotizacion.flete ?? "-"],
-    ["Seguro", cotizacion.seguro ?? "-"],
-    ["Otros gastos", cotizacion.otrosGastos ?? "-"],
-    ["Condición de pago", cotizacion.condicionPago || "-"],
-    ["Tipo de cambio usado", cotizacion.tipoCambioUsado ?? "-"],
-    ["Arancel aplicado", cotizacion.arancelPctUsado ? `${(cotizacion.arancelPctUsado * 100).toFixed(1)}%` : "-"],
-    ["Costo total", `$${Number(cotizacion.costoTotalCLP || 0).toLocaleString("es-CL")} CLP`],
-    ["Precio unitario final", `$${Number(cotizacion.precioUnitarioFinalCLP || 0).toLocaleString("es-CL")} CLP`],
+    ["Embarcador", c.proveedor || "-"],
+    ["Ruta", `${c.puertoOrigen || "-"} a ${c.puertoDestino || "-"} (${c.tipoRuta || "-"})`],
+    ["Peso", `${Number(c.cantidad || 0).toLocaleString("es-CL")} kg`],
+    ["Contenedores", `${c.cantidadContenedores ?? "-"} × ${c.tipoContenedor ?? "-"}' (tope ${c.toneladasPorContenedor ?? 25} t por contenedor${c.contenedoresModificados ? ", cantidad modificada manualmente" : ""})`],
+    ["Tarifa por contenedor", rango(c.tarifaFleteMinPorContenedorUSD, c.tarifaFleteMaxPorContenedorUSD, usd)],
+    ["Flete total", rango(c.tarifaFleteMinUSD, c.tarifaFleteMaxUSD, usd)],
+    ["Valor FOB", `${Number(c.precioFOB || 0).toLocaleString("es-CL")} ${c.moneda || "USD"}`],
+    ["CIF (FOB + flete)", rango(c.cifMinUSD, c.cifMaxUSD, usd)],
+    ["Arancel", `${pct(c.arancelPctUsado)} · ${rango(c.arancelMinUSD, c.arancelMaxUSD, usd)}`],
+    ["IVA", `${pct(c.ivaPctUsado)} · ${rango(c.ivaMinUSD, c.ivaMaxUSD, usd)}`],
+    ["Costos locales", usd(c.costosLocalesUSD)],
+    ["Total en dólares", rango(c.totalMinUSD, c.totalMaxUSD, usd)],
+    ["Tipo de cambio", c.tipoCambioUsado ? `${clp(c.tipoCambioUsado)} (${c.fuenteTipoCambio || "mindicador.cl"}, ${c.fechaTipoCambio ? new Date(c.fechaTipoCambio).toLocaleDateString("es-CL") : "-"})` : "-"],
+    ["Total en pesos (rango)", rango(c.costoTotalMinCLP, c.costoTotalMaxCLP, clp)],
+    ["Total en pesos (punto medio)", clp(c.costoTotalCLP)],
+    ["Costo por kg", c.precioUnitarioFinalCLP ? clp(c.precioUnitarioFinalCLP) : "-"],
+    ["Tránsito", `${c.tiempoTransitoMinDias ?? "-"}–${c.tiempoTransitoMaxDias ?? "-"} días + ${c.margenDias ?? 0} de contingencia = ${c.transitoConMargenMinDias ?? "-"}–${c.transitoConMargenMaxDias ?? "-"} días`],
+    ["Condición de pago", c.condicionPago || "-"],
+    ["Fuente de la tarifa", c.fuenteTarifa || "-"],
+    ["Cotizado por", `${c.creadoPorNombre || "-"} · ${c.createdAt ? new Date(c.createdAt).toLocaleString("es-CL") : "-"}`],
+    ["Nota", "Estimación referencial: no incluye recargos BAF/GRI ni gastos portuarios salvo los costos locales ingresados."],
   ];
 }
 
 function crearHtmlDocumentoCotizacion(cotizacion) {
-  const filas = obtenerFilasCotizacion(cotizacion).map(([label, value]) => `<tr><td>${label}</td><td>${String(value)}</td></tr>`).join("");
+  const escaparHtml = (value) => String(value).replace(/[&<>"']/g, (caracter) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+  })[caracter]);
+  const filas = obtenerFilasCotizacion(cotizacion).map(([label, value]) => `<tr><td>${escaparHtml(label)}</td><td>${escaparHtml(value)}</td></tr>`).join("");
   return `
     <html>
       <head><meta charset="utf-8" /></head>
@@ -48,7 +65,7 @@ function crearHtmlDocumentoCotizacion(cotizacion) {
 }
 
 export function exportarCotizacion(cotizacion, tipo = "pdf") {
-  const nombreBase = `cotizacion-${(cotizacion.producto || "detalle").replace(/\s+/g, "-")}-${cotizacion._id || "sin-id"}`;
+  const nombreBase = `cotizacion-${(cotizacion.puertoOrigen || "ruta").replace(/[^\w-]+/g, "-")}-${cotizacion._id || "sin-id"}`;
 
   if (tipo === "excel") {
     const filas = obtenerFilasCotizacion(cotizacion);
@@ -66,8 +83,6 @@ export function exportarCotizacion(cotizacion, tipo = "pdf") {
   }
 
   const doc = new jsPDF();
-  const clp = (n) => `$${Number(n || 0).toLocaleString("es-CL")} CLP`;
-
   doc.setFillColor(249, 115, 22);
   doc.rect(0, 0, 220, 28, "F");
   doc.setTextColor(255, 255, 255);
@@ -75,39 +90,23 @@ export function exportarCotizacion(cotizacion, tipo = "pdf") {
   doc.setFont("helvetica", "bold");
   doc.text("CINTAC", 14, 18);
   doc.setTextColor(15, 23, 42);
-
   doc.setFontSize(16);
-  doc.text("Cotización de Importación", 14, 42);
+  doc.text("Cotización de importación marítima", 14, 42);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  let y = 56;
-  const linea = (etiqueta, valor) => {
-    doc.text(`${etiqueta}: ${valor ?? "-"}`, 14, y);
-    y += 8;
-  };
-
-  linea("Proveedor", cotizacion.proveedor);
-  linea("Producto", cotizacion.producto);
-  linea("Tipo de producto", cotizacion.tipoProducto);
-  linea("País de origen", cotizacion.paisOrigen);
-  linea("Cantidad", cotizacion.cantidad);
-  linea("Precio FOB unitario", `${cotizacion.precioFOB} ${cotizacion.moneda}`);
-  linea("Flete", cotizacion.flete);
-  linea("Seguro", cotizacion.seguro);
-  linea("Otros gastos", cotizacion.otrosGastos);
-  linea("Condición de pago", cotizacion.condicionPago);
-  y += 4;
-  linea("Tipo de cambio usado", cotizacion.tipoCambioUsado ? clp(cotizacion.tipoCambioUsado) : "-");
-  linea(
-    "Arancel aplicado",
-    cotizacion.arancelPctUsado ? `${(cotizacion.arancelPctUsado * 100).toFixed(1)}%` : "-"
-  );
-  y += 4;
-  doc.setFontSize(13);
-  doc.text(`Costo total: ${clp(cotizacion.costoTotalCLP)}`, 14, y);
-  y += 8;
-  doc.text(`Precio unitario final: ${clp(cotizacion.precioUnitarioFinalCLP)}`, 14, y);
+  doc.setFontSize(10);
+  let y = 54;
+  for (const [etiqueta, valor] of obtenerFilasCotizacion(cotizacion)) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`${etiqueta}:`, 14, y);
+    doc.setFont("helvetica", "normal");
+    const lineas = doc.splitTextToSize(String(valor ?? "-"), 128);
+    doc.text(lineas, 68, y);
+    y += 6 * lineas.length + 1;
+    if (y > 280) {
+      doc.addPage();
+      y = 20;
+    }
+  }
 
   doc.save(`${nombreBase}.pdf`);
 }

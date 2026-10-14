@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/api.js";
 import { useAuth } from "../api/AuthContext.jsx";
+import { LANGUAGES, useLanguage } from "../api/LanguageContext.jsx";
 
 const textos = {
   es: {
@@ -11,6 +12,7 @@ const textos = {
     usuario: "Usuario",
     correoRegistro: "Correo electrónico",
     password: "Contraseña",
+    confirmarPassword: "Confirmar contraseña",
     passwordPlaceholder: "Contraseña",
     crearCuenta: "Crear cuenta",
     ingresar: "Ingresar",
@@ -43,6 +45,7 @@ const textos = {
     usuario: "Username",
     correoRegistro: "Email",
     password: "Password",
+    confirmarPassword: "Confirm password",
     passwordPlaceholder: "Password",
     crearCuenta: "Create account",
     ingresar: "Log in",
@@ -75,6 +78,7 @@ const textos = {
     usuario: "Логин",
     correoRegistro: "Эл. почта",
     password: "Пароль",
+    confirmarPassword: "Подтвердите пароль",
     passwordPlaceholder: "Пароль",
     crearCuenta: "Создать аккаунт",
     ingresar: "Войти",
@@ -107,6 +111,7 @@ const textos = {
     usuario: "用户名",
     correoRegistro: "电子邮件",
     password: "密码",
+    confirmarPassword: "确认密码",
     passwordPlaceholder: "密码",
     crearCuenta: "创建账户",
     ingresar: "登录",
@@ -132,8 +137,56 @@ const textos = {
     confirmarCambio: "确认更改",
     descripcionReset: "我们会将验证码发送到您的邮箱，随后可在不输入当前密码的情况下完成修改。",
   },
+  ja: {
+    acceso: "輸入運賃見積もり — CINTACログイン",
+    correo: "メールアドレスまたはユーザー名",
+    nombre: "氏名",
+    usuario: "ユーザー名",
+    correoRegistro: "メールアドレス",
+    password: "パスワード",
+    confirmarPassword: "パスワードを確認",
+    passwordPlaceholder: "パスワード",
+    crearCuenta: "アカウントを作成",
+    ingresar: "ログイン",
+    volver: "ログインに戻る",
+    alternar: "アカウントを作成",
+    idioma: "言語",
+    tema: "テーマ",
+    claro: "ライト",
+    oscuro: "ダーク",
+    recordar: "ログイン状態を保持",
+    fallos1: "ユーザー名またはパスワードが正しくありません。",
+    fallos2: "残り",
+    fallos3: "回試行できます。その後パスワードを再設定してください。",
+    errorBloqueo: "試行回数の上限に達しました。続行するにはパスワードを変更してください。",
+    cambiarPassword: "パスワードを変更",
+    actual: "現在のパスワード",
+    nueva: "新しいパスワード",
+    restablecer: "新しいパスワードを保存",
+    exitoReset: "パスワードを更新しました。",
+    recuperarLink: "パスワードをお忘れですか？",
+    enviarCodigo: "コードを送信",
+    codigoRecibido: "受信したコード",
+    confirmarCambio: "変更を確認",
+    descripcionReset: "登録メールアドレスに確認コードを送信します。",
+  },
 };
 const MAX_INTENTOS = 5;
+
+function obtenerRutaInicial(usuario) {
+  return ["ADMIN", "SUPERADMIN", "administrador"].includes(usuario?.rol) ? "/admin" : "/";
+}
+
+function LogoCintac() {
+  return (
+    <div className="login-brand" aria-label="CINTAC">
+      <div className="login-brand__mark" aria-hidden="true">
+        <span>C</span>
+      </div>
+      <div className="login-brand__text">CINTAC</div>
+    </div>
+  );
+}
 
 export default function Login() {
   const [modo, setModo] = useState("login");
@@ -142,9 +195,9 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmarPassword, setConfirmarPassword] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
-  const [idioma, setIdioma] = useState(localStorage.getItem("cintac-language") || "es");
   const [tema, setTema] = useState(localStorage.getItem("cintac-theme") || "claro");
   const [rememberMe, setRememberMe] = useState(localStorage.getItem("cintac-remember") === "true");
   const [intentosFallidos, setIntentosFallidos] = useState(Number(localStorage.getItem("cintac-login-fails") || 0));
@@ -156,23 +209,28 @@ export default function Login() {
   const [resetOk, setResetOk] = useState("");
   const [codigoGenerado, setCodigoGenerado] = useState("");
   const { usuario, iniciarSesion } = useAuth();
+  const { language: idioma, setLanguage: setIdioma, t: translate } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (usuario) {
       limpiarIntentos();
-      navigate("/", { replace: true });
+      navigate(obtenerRutaInicial(usuario), { replace: true });
     }
   }, [usuario, navigate]);
 
   useEffect(() => {
-    localStorage.setItem("cintac-language", idioma);
-    document.documentElement.lang = idioma;
-  }, [idioma]);
-
-  useEffect(() => {
+    const oscuro = tema === "oscuro";
     localStorage.setItem("cintac-theme", tema);
-    document.body.dataset.theme = tema === "oscuro" ? "dark" : "light";
+    document.body.dataset.theme = oscuro ? "dark" : "light";
+    document.documentElement.dataset.theme = oscuro ? "dark" : "light";
+    document.documentElement.style.setProperty("--soft-bg", oscuro ? "#1a120e" : "#f7f3ef");
+    document.documentElement.style.setProperty("--card-bg", oscuro ? "#261a16" : "#fffaf6");
+    document.documentElement.style.setProperty("--card-alt", oscuro ? "#2d1e18" : "#fff1e4");
+    document.documentElement.style.setProperty("--input-bg", oscuro ? "#2a201d" : "#ffffff");
+    document.documentElement.style.setProperty("--text", oscuro ? "#f7efe7" : "#1a1a1a");
+    document.documentElement.style.setProperty("--muted", oscuro ? "#d6b89d" : "#555555");
+    document.documentElement.style.setProperty("--border", oscuro ? "#734b2a" : "#f2c49d");
   }, [tema]);
 
   useEffect(() => {
@@ -200,30 +258,38 @@ export default function Login() {
     setCargando(true);
     try {
       if (modo === "registro") {
-        const { token, usuario } = await api.registrar({ nombre, username, email, password });
+        if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+            setError("La nueva contraseña debe tener al menos 8 caracteres e incluir letras y números.");
+          return;
+        }
+        if (password !== confirmarPassword) {
+            setError("Las contraseñas no coinciden.");
+          return;
+        }
+        const { token, usuario } = await api.registrar({ nombre, username, email, password, confirmarPassword });
         iniciarSesion(token, usuario, rememberMe);
         limpiarIntentos();
-        navigate("/");
+        navigate(obtenerRutaInicial(usuario));
         return;
       }
 
       const { token, usuario } = await api.login(identifier, password);
       iniciarSesion(token, usuario, rememberMe);
       limpiarIntentos();
-      navigate("/");
+      navigate(obtenerRutaInicial(usuario));
     } catch (err) {
       const proximoNumero = intentosFallidos + 1;
       localStorage.setItem("cintac-login-fails", String(proximoNumero));
       setIntentosFallidos(proximoNumero);
 
       if (proximoNumero >= MAX_INTENTOS) {
-        setError(t.errorBloqueo);
+          setError("__loginLocked");
         setMostrarCambioPassword(true);
         return;
       }
 
       const restantes = MAX_INTENTOS - proximoNumero;
-      setError(`${t.fallos1} ${t.fallos2} ${restantes} ${t.fallos3}`);
+        setError("__loginFailure");
     } finally {
       setCargando(false);
     }
@@ -236,16 +302,16 @@ export default function Login() {
 
     const correoDestino = (resetEmail || email || "").trim();
     if (!correoDestino) {
-      setError("Debes ingresar tu correo electrónico.");
+        setError("Debes ingresar tu correo electrónico.");
       return;
     }
 
     try {
       await api.solicitarCodigoReset({ email: correoDestino });
       setCodigoGenerado("enviado");
-      setResetOk("Se envió un código de confirmación a tu correo.");
+        setResetOk("Si la cuenta existe, enviaremos un código al correo registrado.");
     } catch (err) {
-      setError(err.message === "Usuario no encontrado." ? "No tienes cuenta con nosotros." : err.message);
+        setError(err.message);
     }
   }
 
@@ -262,22 +328,21 @@ export default function Login() {
       });
       iniciarSesion(token, usuario, rememberMe);
       limpiarIntentos();
-      setResetOk(t.exitoReset);
+        setResetOk("Contraseña actualizada correctamente.");
       setMostrarCambioPassword(false);
-      navigate("/");
+      navigate(obtenerRutaInicial(usuario));
     } catch (err) {
-      setError(err.message === "Usuario no encontrado." ? "No tienes cuenta con nosotros." : err.message);
+        setError(err.message);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-[340px] flex-col items-center justify-center px-4 text-center">
-      <div className="w-full">
-        <div className="text-[28px] font-bold tracking-[1px] text-[#e55303]">CINTAC</div>
-        <p className="mt-2 text-[13px]" style={{ color: "var(--muted)" }}>{t.acceso}</p>
-      </div>
+    <div className="login-page">
+      <div className="login-shell">
+        <LogoCintac />
+        <p className="login-subtitle">{t.acceso}</p>
 
-      <form onSubmit={manejarEnvio} className="tarjeta mt-5 w-full">
+      <form onSubmit={manejarEnvio} className="tarjeta login-card">
         {modo === "registro" ? (
           <>
             <div>
@@ -302,7 +367,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="mt-1"
-                placeholder="usuario_cintac"
+                placeholder={translate("usuario_cintac")}
               />
             </div>
 
@@ -315,7 +380,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1"
-                placeholder="nombre@cintac.cl"
+                placeholder={translate("nombre@cintac.cl")}
               />
             </div>
           </>
@@ -329,7 +394,7 @@ export default function Login() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="mt-1"
-              placeholder="usuario o nombre@cintac.cl"
+              placeholder={translate("usuario o nombre@cintac.cl")}
             />
           </div>
         )}
@@ -347,6 +412,21 @@ export default function Login() {
           />
         </div>
 
+        {modo === "registro" && (
+          <div>
+            <label htmlFor="confirmarPassword">{t.confirmarPassword}</label>
+            <input
+              id="confirmarPassword"
+              type="password"
+              required
+              autoComplete="new-password"
+              value={confirmarPassword}
+              onChange={(e) => setConfirmarPassword(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        )}
+
         <label className="mt-3 flex items-center justify-between gap-3 text-left">
           <span>{t.recordar}</span>
           <input
@@ -359,7 +439,11 @@ export default function Login() {
 
         {error && (
           <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-            {error}
+            {error === "__loginLocked"
+              ? t.errorBloqueo
+              : error === "__loginFailure"
+                ? `${t.fallos1} ${t.fallos2} ${Math.max(0, MAX_INTENTOS - intentosFallidos)} ${t.fallos3}`
+                : translate(error)}
           </p>
         )}
 
@@ -391,7 +475,7 @@ export default function Login() {
               value={resetEmail || email || ""}
               onChange={(e) => setResetEmail(e.target.value)}
               className="mt-1"
-              placeholder="usuario@cintac.cl"
+              placeholder={translate("usuario@cintac.cl")}
             />
           </div>
 
@@ -433,10 +517,7 @@ export default function Login() {
         <div className="flex-1">
           <label htmlFor="loginIdioma">{t.idioma}</label>
           <select id="loginIdioma" value={idioma} onChange={(e) => setIdioma(e.target.value)}>
-            <option value="es">Español</option>
-            <option value="en">English</option>
-            <option value="ru">Русский</option>
-            <option value="zh">中文</option>
+            {LANGUAGES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
         <div className="flex-1">
@@ -472,6 +553,7 @@ export default function Login() {
           {t.alternar}
         </button>
       )}
+      </div>
     </div>
   );
 }

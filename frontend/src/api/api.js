@@ -20,6 +20,9 @@ async function solicitar(ruta, opciones = {}) {
 
   const datos = await respuesta.json().catch(() => ({}));
   if (!respuesta.ok) {
+    if (respuesta.status === 401 && ruta !== "/usuarios/login") {
+      window.dispatchEvent(new Event("cintac:session-expired"));
+    }
     throw new Error(datos.error || "Ocurrió un error al conectar con el servidor.");
   }
   return datos;
@@ -43,6 +46,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+  listarUsuarios: () => solicitar("/usuarios"),
   reestablecerPassword: (payload) =>
     solicitar("/usuarios/reset-password", {
       method: "POST",
@@ -63,17 +67,47 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  solicitarAprobacionRol: (payload) =>
+    solicitar("/usuarios/aprobacion-rol/solicitar", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  confirmarAprobacionRol: (payload) =>
+    solicitar("/usuarios/aprobacion-rol/confirmar", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   crearCotizacion: (datos) =>
     solicitar("/cotizaciones", { method: "POST", body: JSON.stringify(datos) }),
   calcularCotizacion: (id) => solicitar(`/cotizaciones/${id}/calcular`, { method: "POST" }),
   finalizarCotizacion: (id) => solicitar(`/cotizaciones/${id}/finalizar`, { method: "POST" }),
+  eliminarCotizacion: (id, payload) =>
+    solicitar(`/cotizaciones/${id}`, { method: "DELETE", body: JSON.stringify(payload) }),
   obtenerCotizacion: (id) => solicitar(`/cotizaciones/${id}`),
   listarCotizaciones: (filtros = {}) => {
     const query = new URLSearchParams(filtros).toString();
     return solicitar(`/cotizaciones${query ? `?${query}` : ""}`);
   },
+  obtenerTarifaCotizacion: (filtros) => {
+    const query = new URLSearchParams(filtros).toString();
+    return solicitar(`/cotizaciones/tarifa?${query}`);
+  },
   compararCotizaciones: (ids) => solicitar(`/cotizaciones/comparar?ids=${ids.join(",")}`),
 
+  obtenerCatalogoCotizacion: () => solicitar("/cotizaciones/catalogo"),
+
+  listarTarifas: (filtros = {}) => {
+    const query = new URLSearchParams(filtros).toString();
+    return solicitar(`/tarifas${query ? `?${query}` : ""}`);
+  },
+  actualizarTarifa: (id, datos) => solicitar(`/tarifas/${id}`, { method: "PUT", body: JSON.stringify(datos) }),
+  actualizarParametro: (nombre, valor) =>
+    solicitar(`/tarifas/parametros/${encodeURIComponent(nombre)}`, { method: "PUT", body: JSON.stringify({ valor }) }),
+  crearEmbarcador: (nombre) => solicitar("/tarifas/embarcadores", { method: "POST", body: JSON.stringify({ nombre }) }),
+  actualizarEmbarcador: (id, datos) =>
+    solicitar(`/tarifas/embarcadores/${id}`, { method: "PATCH", body: JSON.stringify(datos) }),
+
   obtenerIndicadores: () => solicitar("/tipo-cambio"),
+  listarAuditoria: () => solicitar("/usuarios/auditoria?limit=100"),
 };
