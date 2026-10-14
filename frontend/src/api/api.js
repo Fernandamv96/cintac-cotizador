@@ -1,4 +1,4 @@
-const BASE_URL =
+export const BASE_URL =
   import.meta.env.VITE_API_URL ||
   (typeof window !== "undefined" ? `${window.location.origin}/api` : "http://localhost:4000/api");
 
@@ -29,6 +29,7 @@ async function solicitar(ruta, opciones = {}) {
 }
 
 export const api = {
+  salud: () => solicitar("/health"),
   login: (identifier, password) =>
     solicitar("/usuarios/login", {
       method: "POST",

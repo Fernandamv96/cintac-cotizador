@@ -1,16 +1,20 @@
 /** @type {import('tailwindcss').Config} */
+// Los colores apuntan a variables CSS (src/index.css) para que cambien con el tema.
+const variable = (nombre) => `rgb(var(${nombre}) / <alpha-value>)`;
+
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        papel: "#EFF2F1",
-        tinta: "#16232B",
-        acero: "#2F4858",
-        "acero-claro": "#5C7A8A",
-        ambar: "#D69A2D",
-        exito: "#3C7A5E",
-        peligro: "#B23A2E",
+        papel: variable("--rgb-fondo"),
+        tinta: variable("--rgb-texto"),
+        acero: variable("--rgb-texto"),
+        "acero-claro": variable("--rgb-suave"),
+        ambar: variable("--rgb-ambar"),
+        naranja: variable("--rgb-naranja"),
+        exito: variable("--rgb-exito"),
+        peligro: variable("--rgb-peligro"),
       },
       fontFamily: {
         display: ["'Space Grotesk'", "sans-serif"],

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/api.js";
 import { useAuth } from "../api/AuthContext.jsx";
 import { LANGUAGES, useLanguage } from "../api/LanguageContext.jsx";
+import { BlurText, GradientText, LogoCintac, ShinyText, SpotlightCard } from "../components/bits.jsx";
+import { aplicarTema, temaInicial } from "../utils/tema.js";
 
 const textos = {
   es: {
@@ -177,17 +179,6 @@ function obtenerRutaInicial(usuario) {
   return ["ADMIN", "SUPERADMIN", "administrador"].includes(usuario?.rol) ? "/admin" : "/";
 }
 
-function LogoCintac() {
-  return (
-    <div className="login-brand" aria-label="CINTAC">
-      <div className="login-brand__mark" aria-hidden="true">
-        <span>C</span>
-      </div>
-      <div className="login-brand__text">CINTAC</div>
-    </div>
-  );
-}
-
 export default function Login() {
   const [modo, setModo] = useState("login");
   const [identifier, setIdentifier] = useState("");
@@ -198,7 +189,7 @@ export default function Login() {
   const [confirmarPassword, setConfirmarPassword] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
-  const [tema, setTema] = useState(localStorage.getItem("cintac-theme") || "claro");
+  const [tema, setTema] = useState(temaInicial);
   const [rememberMe, setRememberMe] = useState(localStorage.getItem("cintac-remember") === "true");
   const [intentosFallidos, setIntentosFallidos] = useState(Number(localStorage.getItem("cintac-login-fails") || 0));
   const [mostrarCambioPassword, setMostrarCambioPassword] = useState(false);
@@ -220,17 +211,7 @@ export default function Login() {
   }, [usuario, navigate]);
 
   useEffect(() => {
-    const oscuro = tema === "oscuro";
-    localStorage.setItem("cintac-theme", tema);
-    document.body.dataset.theme = oscuro ? "dark" : "light";
-    document.documentElement.dataset.theme = oscuro ? "dark" : "light";
-    document.documentElement.style.setProperty("--soft-bg", oscuro ? "#1a120e" : "#f7f3ef");
-    document.documentElement.style.setProperty("--card-bg", oscuro ? "#261a16" : "#fffaf6");
-    document.documentElement.style.setProperty("--card-alt", oscuro ? "#2d1e18" : "#fff1e4");
-    document.documentElement.style.setProperty("--input-bg", oscuro ? "#2a201d" : "#ffffff");
-    document.documentElement.style.setProperty("--text", oscuro ? "#f7efe7" : "#1a1a1a");
-    document.documentElement.style.setProperty("--muted", oscuro ? "#d6b89d" : "#555555");
-    document.documentElement.style.setProperty("--border", oscuro ? "#734b2a" : "#f2c49d");
+    aplicarTema(tema);
   }, [tema]);
 
   useEffect(() => {
@@ -338,11 +319,28 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-shell">
-        <LogoCintac />
-        <p className="login-subtitle">{t.acceso}</p>
+      <section className="login-hero fade-up">
+        <LogoCintac size={48} />
+        <div className="mt-8">
+          <span className="chip"><span className="chip__dot" />{translate("Comercio Exterior · Importación marítima")}</span>
+        </div>
+        <BlurText as="h1" text={translate("Cotiza tu flete de importación")} />
+        <p>
+          <ShinyText>{translate("Compara embarcadores, calcula contenedores e internación en CLP con el dólar del día.")}</ShinyText>
+        </p>
+        <div className="login-features">
+          <SpotlightCard><strong>25 t</strong><span>{translate("por contenedor, editable")}</span></SpotlightCard>
+          <SpotlightCard><strong>CIF + IVA</strong><span>{translate("según reglas de Comex")}</span></SpotlightCard>
+          <SpotlightCard><strong>PDF · Excel</strong><span>{translate("exporta el desglose")}</span></SpotlightCard>
+        </div>
+      </section>
 
+      <div className="login-shell fade-up" style={{ animationDelay: "120ms" }}>
       <form onSubmit={manejarEnvio} className="tarjeta login-card">
+        <h2>
+          {modo === "registro" ? t.crearCuenta : <GradientText>{t.ingresar}</GradientText>}
+        </h2>
+        <p className="login-subtitle">{t.acceso}</p>
         {modo === "registro" ? (
           <>
             <div>
@@ -427,18 +425,18 @@ export default function Login() {
           </div>
         )}
 
-        <label className="mt-3 flex items-center justify-between gap-3 text-left">
-          <span>{t.recordar}</span>
+        <label className="mt-4 flex items-center gap-3 text-left">
           <input
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
             className="h-4 w-4"
           />
+          <span>{t.recordar}</span>
         </label>
 
         {error && (
-          <p role="alert" className="mt-3 rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+          <p role="alert" className="alerta mt-3">
             {error === "__loginLocked"
               ? t.errorBloqueo
               : error === "__loginFailure"
@@ -450,7 +448,7 @@ export default function Login() {
         {intentosFallidos >= MAX_INTENTOS && (
           <button
             type="button"
-            className="mt-3 text-left text-xs font-medium text-[#f5b483] underline underline-offset-2"
+            className="link-suave mt-3 text-left"
             onClick={() => setMostrarCambioPassword((prev) => !prev)}
           >
             {t.recuperarLink}
@@ -465,7 +463,7 @@ export default function Login() {
       {mostrarCambioPassword && (
         <form onSubmit={codigoGenerado ? manejarCambioPasswordBloqueado : manejarCodigoReset} className="tarjeta mt-4 w-full">
           <h3 className="mb-2 text-left text-base">{t.cambiarPassword}</h3>
-          <p className="mb-3 text-left text-xs text-slate-300">{t.descripcionReset}</p>
+          <p className="mb-3 text-left text-xs text-acero-claro">{t.descripcionReset}</p>
           <div>
             <label htmlFor="resetEmail">{t.correoRegistro}</label>
             <input
@@ -509,7 +507,7 @@ export default function Login() {
               <button type="submit" className="btn-primario mt-3 w-full">{t.confirmarCambio}</button>
             </>
           )}
-          {resetOk && <p className="mt-3 text-sm text-green-700">{resetOk}</p>}
+          {resetOk && <p className="mt-3 text-sm text-exito">{resetOk}</p>}
         </form>
       )}
 
@@ -532,7 +530,7 @@ export default function Login() {
       {modo === "registro" ? (
         <button
           type="button"
-          className="mt-4 w-full rounded-md border border-[#e55303] bg-white px-3 py-2 text-[13px] font-semibold text-[#e55303] transition hover:bg-[#fff6f0]"
+          className="btn-secundario mt-4 w-full"
           onClick={() => {
             setError("");
             setPassword("");
@@ -544,7 +542,7 @@ export default function Login() {
       ) : (
         <button
           type="button"
-          className="mt-4 text-[13px] text-[#555] underline underline-offset-2"
+          className="link-suave mt-4 block w-full text-center"
           onClick={() => {
             setError("");
             setModo("registro");

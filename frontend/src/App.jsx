@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./api/AuthContext.jsx";
 import { LanguageProvider, useLanguage } from "./api/LanguageContext.jsx";
 import Navbar from "./components/Navbar.jsx";
+import { Aurora, ClickSpark, useSpotlightGlobal } from "./components/bits.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import NuevaCotizacion from "./pages/NuevaCotizacion.jsx";
@@ -150,8 +151,11 @@ function Footer() {
 }
 
 function Layout() {
+  useSpotlightGlobal();
   return (
     <>
+      <Aurora />
+      <ClickSpark />
       <Navbar />
       <Routes>
         <Route path="/login" element={<Login />} />
