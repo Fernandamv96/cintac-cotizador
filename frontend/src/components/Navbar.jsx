@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api } from "../api/api.js";
 import { useAuth } from "../api/AuthContext.jsx";
 import { LANGUAGES, useLanguage } from "../api/LanguageContext.jsx";
+import { aplicarTema, temaInicial } from "../utils/tema.js";
+import { LogoCintac } from "./bits.jsx";
 
 const enlaces = [
   { to: "/", texto: "Inicio", fin: true },
@@ -119,9 +121,8 @@ export default function Navbar() {
   const { usuario, cerrarSesion } = useAuth();
   const { language: idioma, setLanguage: setIdioma, t: translate } = useLanguage();
   const navigate = useNavigate();
-  const location = useLocation();
   const [mostrarConfig, setMostrarConfig] = useState(false);
-  const [tema, setTema] = useState(localStorage.getItem("cintac-theme") || "claro");
+  const [tema, setTema] = useState(temaInicial);
   const [username, setUsername] = useState(usuario?.username || "");
   const [email, setEmail] = useState(usuario?.email || "");
   const [passwordActual, setPasswordActual] = useState("");
@@ -146,17 +147,7 @@ export default function Navbar() {
   const [cargandoAprobacionRol, setCargandoAprobacionRol] = useState(false);
 
   useEffect(() => {
-    const oscuro = tema === "oscuro";
-    localStorage.setItem("cintac-theme", tema);
-    document.body.dataset.theme = oscuro ? "dark" : "light";
-    document.documentElement.dataset.theme = oscuro ? "dark" : "light";
-    document.documentElement.style.setProperty("--soft-bg", oscuro ? "#1a120e" : "#f7f3ef");
-    document.documentElement.style.setProperty("--card-bg", oscuro ? "#261a16" : "#fffaf6");
-    document.documentElement.style.setProperty("--card-alt", oscuro ? "#2d1e18" : "#fff1e4");
-    document.documentElement.style.setProperty("--input-bg", oscuro ? "#2a201d" : "#ffffff");
-    document.documentElement.style.setProperty("--text", oscuro ? "#f7efe7" : "#1a1a1a");
-    document.documentElement.style.setProperty("--muted", oscuro ? "#d6b89d" : "#555555");
-    document.documentElement.style.setProperty("--border", oscuro ? "#734b2a" : "#f2c49d");
+    aplicarTema(tema);
   }, [tema]);
 
   useEffect(() => {
@@ -284,64 +275,59 @@ export default function Navbar() {
   const esAdmin = ["ADMIN", "SUPERADMIN", "administrador"].includes(usuario.rol);
   const paginaInicio = esAdmin ? "/admin" : "/";
 
-  function volver() {
-    navigate(paginaInicio, { replace: true });
-  }
 
   return (
-    <header className="navbar-shell border-b-[4px] border-[#ff4f01]">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Link
-            to={esAdmin ? "/admin" : "/"}
-            aria-label={translate("CINTAC, volver al inicio")}
-            className="rounded-sm text-[38px] font-black uppercase tracking-[1px] leading-none text-[#e55303] hover:text-[#c74a0b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e55303]"
-          >
-            CINTAC
-          </Link>
-          <div className="hidden text-base font-semibold text-[#d65a00] sm:block">{translate("Cotizador de flete de importación")}</div>
-        </div>
+    <header className="navbar-shell">
+      <div className="navbar-bar">
+        <Link to={paginaInicio} aria-label={translate("CINTAC, volver al inicio")} className="logo-cintac">
+          <LogoCintac size={36} />
+          <span className="hidden text-xs font-medium text-acero-claro 2xl:block">{translate("Cotizador de flete de importación")}</span>
+        </Link>
 
-        <nav className="flex flex-wrap items-center gap-4 text-base font-medium">
-          {location.pathname !== paginaInicio && (
-            <button type="button" className="btn-secondary px-3 py-2 text-sm" onClick={volver}>
-              <span aria-hidden="true">← </span>{translate("Volver al inicio")}
-            </button>
-          )}
+        <nav className="nav-pills" aria-label={translate("Navegación principal")}>
           {(esAdmin
             ? [
                 ...enlaces,
-                { to: "/admin", texto: "Panel" },
+                { to: "/admin", texto: "Panel", fin: true },
                 { to: "/admin/usuarios", texto: "Usuarios" },
                 { to: "/admin/auditoria", texto: "Auditoría" },
               ]
             : enlaces
           ).map((enlace) => (
-            <NavLink
-              key={enlace.to}
-              to={enlace.to}
-              end={enlace.fin}
-              className={({ isActive }) => `${isActive ? "text-[#e55303]" : "nav-link"}`}
-            >
+            <NavLink key={enlace.to} to={enlace.to} end={enlace.fin} className="nav-link">
               {translate(enlace.texto)}
             </NavLink>
           ))}
         </nav>
 
-        <div className="flex items-center gap-3 text-sm">
-          <span>
-            <span>{usuario.nombre} · <span className="italic">{translate(usuario.rol.replace("_", " "))}</span></span>
-            <span>{usuario.email}</span>
+        <div className="nav-user">
+          <span className="nav-user__avatar" aria-hidden="true">{(usuario.nombre || "?").trim().charAt(0).toUpperCase()}</span>
+          <span className="nav-user__datos">
+            <strong>{usuario.nombre}</strong>
+            <small>{translate(usuario.rol.replace("_", " "))}</small>
           </span>
           <button
             type="button"
-            className="btn-secondary btn-config px-4 py-2 text-sm"
-            onClick={() => setMostrarConfig((prev) => !prev)}
+            className="icon-btn"
+            aria-label={tema === "oscuro" ? t.claro : t.oscuro}
+            title={`${t.tema}: ${tema === "oscuro" ? t.oscuro : t.claro}`}
+            onClick={() => setTema((prev) => (prev === "oscuro" ? "claro" : "oscuro"))}
           >
-            {t.config}
+            <span aria-hidden="true">{tema === "oscuro" ? "☀" : "☾"}</span>
           </button>
           <button
-            className="btn-secondary btn-config px-4 py-2 text-sm"
+            type="button"
+            className="icon-btn"
+            aria-label={t.config}
+            title={t.config}
+            aria-expanded={mostrarConfig}
+            onClick={() => setMostrarConfig((prev) => !prev)}
+          >
+            <span aria-hidden="true">⚙</span>
+          </button>
+          <button
+            type="button"
+            className="btn-secundario whitespace-nowrap px-3 py-2 text-sm"
             onClick={() => {
               cerrarSesion();
               navigate("/login");
@@ -353,8 +339,8 @@ export default function Navbar() {
       </div>
 
       {mostrarConfig && (
-        <div className="config-panel border-t">
-          <div className="mx-auto max-w-5xl px-6 py-5">
+        <div className="config-panel">
+          <div className="px-6 py-5">
             <form onSubmit={manejarConfiguracion} className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="m-0 text-sm font-semibold" style={{ color: "var(--text)" }}>{t.nota}</p>
@@ -406,10 +392,10 @@ export default function Navbar() {
               </div>
 
               {codigoEnviado && (
-                <p className="m-0 text-sm text-amber-500">{translate(codigoEnviado === "sent" ? "Se envió un código de confirmación a tu correo." : codigoEnviado)}</p>
+                <p className="m-0 text-sm text-ambar">{translate(codigoEnviado === "sent" ? "Se envió un código de confirmación a tu correo." : codigoEnviado)}</p>
               )}
-              {errorConfig && <p className="m-0 text-sm text-red-500">{translate(errorConfig)}</p>}
-              {okConfig && <p className="m-0 text-sm text-green-500">{translate(okConfig)}</p>}
+              {errorConfig && <p className="m-0 text-sm text-peligro">{translate(errorConfig)}</p>}
+              {okConfig && <p className="m-0 text-sm text-exito">{translate(okConfig)}</p>}
             </form>
 
             {esAdmin && (
@@ -417,9 +403,6 @@ export default function Navbar() {
                 <h3 className="text-lg">{translate("Agregar administrador o jefatura")}</h3>
                 <p className="text-sm text-acero-claro">
                   {translate("La cuenta solo se crea después de introducir el código enviado al correo principal de aprobación. El código vence en 10 minutos y permite cinco intentos.")}
-                </p>
-                <p className="text-sm text-amber-700">
-                  {translate("Aviso: las solicitudes pendientes se guardan temporalmente en memoria; en Vercel la confirmación puede fallar si llega a otra instancia.")}
                 </p>
                 {!aprobacionRol ? (
                   <form onSubmit={solicitarAltaRol} className="grid gap-4 sm:grid-cols-2">
@@ -496,8 +479,8 @@ export default function Navbar() {
                     </button>
                   </form>
                 )}
-                {errorAprobacionRol && <p role="alert" className="mt-3 text-sm text-red-500">{translate(errorAprobacionRol)}</p>}
-                {okAprobacionRol && <p role="status" className="mt-3 text-sm text-green-600">{translate(okAprobacionRol)}</p>}
+                {errorAprobacionRol && <p role="alert" className="mt-3 text-sm text-peligro">{translate(errorAprobacionRol)}</p>}
+                {okAprobacionRol && <p role="status" className="mt-3 text-sm text-exito">{translate(okAprobacionRol)}</p>}
               </section>
             )}
           </div>

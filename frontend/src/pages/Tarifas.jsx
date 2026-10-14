@@ -143,7 +143,7 @@ export default function Tarifas() {
         <h3 className="text-lg">{t("Embarcadores")}</h3>
         <ul className="mt-3 flex flex-wrap gap-3">
           {(datos?.embarcadores || []).map((e) => (
-            <li key={e.id} className="flex items-center gap-2 rounded-md border border-[#f2c49d] px-3 py-2">
+            <li key={e.id} className="flex items-center gap-2 rounded-md border border-[var(--borde)] px-3 py-2">
               <span className={e.activo ? "" : "text-acero-claro line-through"}>{e.nombre}</span>
               <button type="button" className="text-sm underline" onClick={() => cambiarEstadoEmbarcador(e)}>
                 {e.activo ? t("Desactivar") : t("Activar")}
@@ -188,7 +188,7 @@ export default function Tarifas() {
             </thead>
             <tbody>
               {tarifasVisibles.map((tarifa) => (
-                <tr key={tarifa.id} className={`border-b border-acero-claro/15 ${edicion[tarifa.id] ? "bg-orange-50" : ""}`}>
+                <tr key={tarifa.id} className={`border-b border-acero-claro/15 ${edicion[tarifa.id] ? "bg-naranja/10" : ""}`}>
                   <td className="py-1 pr-2">{tarifa.puertoOrigen} → {tarifa.puertoDestino}</td>
                   <td className="py-1 pr-2">{tarifa.embarcador}</td>
                   <td className="py-1 pr-2">{tarifa.tipoContenedor}'</td>

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../api/AuthContext.jsx";
+import { BASE_URL } from "../api/api.js";
 import { useLanguage } from "../api/LanguageContext.jsx";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 function normalizarRol(rol) {
   if (["administrador", "ADMIN"].includes(rol)) return "ADMIN";

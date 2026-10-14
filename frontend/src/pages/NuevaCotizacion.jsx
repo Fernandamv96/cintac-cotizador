@@ -202,12 +202,12 @@ export default function NuevaCotizacion() {
             <fieldset className="sm:col-span-2">
               <legend className="mb-2 text-sm font-semibold text-acero">{t("Cantidad de contenedores")}</legend>
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#f2c49d] p-3">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--borde)] p-3">
                   <input className="!h-4 !w-4" type="radio" name="modoContenedor" value="peso" disabled={bloqueado}
                     checked={form.modoContenedor === "peso"} onChange={() => actualizarCampo("modoContenedor", "peso")} />
                   <span>{t("Calcular por peso (tope de {t} t por contenedor)", { t: tope })}</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#f2c49d] p-3">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--borde)] p-3">
                   <input className="!h-4 !w-4" type="radio" name="modoContenedor" value="manual" disabled={bloqueado}
                     checked={form.modoContenedor === "manual"} onChange={() => actualizarCampo("modoContenedor", "manual")} />
                   <span>{t("Ingresar la cantidad manualmente")}</span>
@@ -248,7 +248,7 @@ export default function NuevaCotizacion() {
               <input id="otrosGastos" type="number" min="0" step="0.01" disabled={bloqueado}
                 value={form.otrosGastos} onChange={(e) => actualizarCampo("otrosGastos", e.target.value)} />
             </div>
-            <div className="rounded-md border border-dashed border-orange-400 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+            <div className="aviso">
               {t("Reglas de Comex: CIF = FOB + flete (sin seguro). Arancel {a} % e IVA {i} % sobre CIF + arancel. Los valores se cambian en Tarifas.", { a: arancelPct, i: ivaPct })}
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function NuevaCotizacion() {
                 </thead>
                 <tbody>
                   {comparacion.opciones.map((o) => (
-                    <tr key={o.embarcador} className={`border-b border-acero-claro/15 ${form.proveedor === o.embarcador ? "bg-orange-50" : ""}`}>
+                    <tr key={o.embarcador} className={`border-b border-acero-claro/15 ${form.proveedor === o.embarcador ? "bg-naranja/10" : ""}`}>
                       <td className="py-2 pr-3">
                         <input className="!h-4 !w-4" type="radio" name="proveedor" aria-label={o.embarcador} disabled={bloqueado}
                           checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
