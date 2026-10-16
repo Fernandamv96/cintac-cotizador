@@ -62,12 +62,7 @@ Si las tablas ya existen, no hace nada.
    Neon (Serverless Postgres)* → plan **Free** → región más cercana (São Paulo si
    aparece, si no `us-east-1`) → *Connect Project* marcando Production, Preview y
    Development. Vercel crea sola la variable `DATABASE_URL`.
-4. **Variables de entorno.** *Settings → Environment Variables*, agrega:
-   | Variable | Valor |
-   | --- | --- |
-   | `JWT_SECRET` | 48+ caracteres aleatorios (ver `backend/.env.example`) |
-   | `ADMIN_INITIAL_PASSWORD` | contraseña de `Cintac_Admin`, 12+ caracteres con letras y números |
-   | `CORS_ORIGIN` | la URL del proyecto, por ejemplo `https://cintac-cotizador.vercel.app` |
+
 5. **Redeploy.** *Deployments → … → Redeploy*. Abre la URL, entra con `Cintac_Admin`
    y la contraseña del paso 4. En ese primer acceso se crean las tablas.
 6. **Revisar los datos.** En Vercel *Storage → (tu base) → Open in Neon → Tables*
