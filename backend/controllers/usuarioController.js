@@ -47,6 +47,15 @@ function datosPublicos(usuario) {
   };
 }
 
+// Dominios de correo autorizados para el registro público (variable REGISTRO_DOMINIOS_PERMITIDOS,
+// separada por comas, por ejemplo "cintac.cl"). Si está vacía, el registro queda abierto.
+function dominiosDeRegistro() {
+  return String(process.env.REGISTRO_DOMINIOS_PERMITIDOS || "")
+    .split(",")
+    .map((dominio) => dominio.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
+}
+
 function passwordCumplePolitica(password) {
   return typeof password === "string" && password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
 }
@@ -94,6 +103,12 @@ export async function registrar(req, res) {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
       return res.status(400).json({ error: "Ingresa un correo electrónico válido." });
+    }
+    const dominiosPermitidos = dominiosDeRegistro();
+    if (dominiosPermitidos.length && !dominiosPermitidos.includes(emailNormalizado.split("@")[1])) {
+      return res.status(403).json({
+        error: `El registro está limitado a correos de: ${dominiosPermitidos.join(", ")}. Pide tu cuenta al administrador.`,
+      });
     }
     if (!passwordCumplePolitica(password)) {
       return res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres e incluir letras y números." });

@@ -62,7 +62,13 @@ Si las tablas ya existen, no hace nada.
    Neon (Serverless Postgres)* → plan **Free** → región más cercana (São Paulo si
    aparece, si no `us-east-1`) → *Connect Project* marcando Production, Preview y
    Development. Vercel crea sola la variable `DATABASE_URL`.
-
+4. **Variables de entorno.** *Settings → Environment Variables*, agrega:
+   | Variable | Valor |
+   | --- | --- |
+   | `JWT_SECRET` | 48+ caracteres aleatorios (ver `backend/.env.example`) |
+   | `ADMIN_INITIAL_PASSWORD` | contraseña de `Cintac_Admin`, 12+ caracteres con letras y números |
+   | `CORS_ORIGIN` | la URL del proyecto, por ejemplo `https://cintac-cotizador.vercel.app` |
+   | `REGISTRO_DOMINIOS_PERMITIDOS` | `cintac.cl` (solo esos correos pueden usar "Crear una cuenta"; vacío = abierto) |
 5. **Redeploy.** *Deployments → … → Redeploy*. Abre la URL, entra con `Cintac_Admin`
    y la contraseña del paso 4. En ese primer acceso se crean las tablas.
 6. **Revisar los datos.** En Vercel *Storage → (tu base) → Open in Neon → Tables*
@@ -80,7 +86,7 @@ cd backend
 npm install
 cp .env.example .env      # pega DATABASE_URL de Neon, JWT_SECRET y ADMIN_INITIAL_PASSWORD
 npm run db:setup          # crea tablas y datos iniciales (opcional: también ocurre solo)
-npm test                  # 10 pruebas del motor de cálculo
+npm test                  # 10 pruebas del motor de cálculo (+15 de integración si defines TEST_DATABASE_URL)
 npm run dev               # http://localhost:4000
 
 cd ../frontend
@@ -90,6 +96,16 @@ npm run dev               # http://localhost:5173/frontend/
 
 Tip: con la CLI de Vercel (`npm i -g vercel`, `vercel link`, `vercel env pull backend/.env`)
 se descargan las mismas variables del proyecto.
+
+## Pruebas
+
+- `npm test`: 10 pruebas unitarias del motor de cálculo.
+- `TEST_DATABASE_URL=postgres://... npm test`: además 15 pruebas de integración de la API contra una base
+  de pruebas **separada** (se borra y recrea en cada ejecución; nunca uses la de producción).
+- `BASE_URL=... CLAVE=... node tests/carga.mjs`: prueba de carga con 1, 10, 25 y 50 usuarios simultáneos.
+- GitHub Actions (`.github/workflows/ci.yml`) ejecuta todo lo anterior, salvo la carga, en cada Pull Request.
+
+Detalle de cada endpoint en [docs/API.md](docs/API.md) y forma de trabajo en [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Pendiente de confirmar con Comex
 

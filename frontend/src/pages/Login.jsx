@@ -259,6 +259,12 @@ export default function Login() {
       limpiarIntentos();
       navigate(obtenerRutaInicial(usuario));
     } catch (err) {
+      if (modo === "registro") {
+        // Un registro rechazado (correo no autorizado, usuario repetido, etc.) no es un intento
+        // fallido de inicio de sesión: se muestra el motivo que entrega el servidor.
+        setError(err.message);
+        return;
+      }
       const proximoNumero = intentosFallidos + 1;
       localStorage.setItem("cintac-login-fails", String(proximoNumero));
       setIntentosFallidos(proximoNumero);

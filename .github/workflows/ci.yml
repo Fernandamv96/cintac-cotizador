@@ -1,0 +1,41 @@
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cintac_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Backend - instalar
+        run: npm ci
+        working-directory: backend
+      - name: Backend - pruebas unitarias y de integración
+        run: npm test
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/cintac_test
+      - name: Backend - auditoría de dependencias
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: backend
+      - name: Frontend - instalar y compilar
+        run: npm ci && npm run build
+        working-directory: frontend
+      - name: Frontend - auditoría de dependencias
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: frontend

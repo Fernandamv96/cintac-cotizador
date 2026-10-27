@@ -268,7 +268,26 @@ export default function NuevaCotizacion() {
               {t("{ton} t → {n} contenedor(es) de {tipo}'", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores, tipo: comparacion.tipoContenedor })}
               {comparacion.contenedoresModificados && ` · ${t("modificado manualmente (sugerido: {s})", { s: comparacion.contenedoresSugeridos })}`}
             </p>
-            <div className="mt-3 overflow-x-auto">
+            {/* En pantallas angostas cada embarcador se muestra como tarjeta (sin desplazamiento horizontal). */}
+            <div className="mt-3 space-y-3 sm:hidden">
+              {comparacion.opciones.map((o) => (
+                <label key={o.embarcador}
+                  className={`block cursor-pointer rounded-md border p-3 ${form.proveedor === o.embarcador ? "border-naranja bg-naranja/10" : "border-[var(--borde)]"}`}>
+                  <span className="flex items-center gap-2 font-semibold">
+                    <input className="!h-4 !w-4" type="radio" name="proveedor-movil" disabled={bloqueado}
+                      checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
+                    {o.embarcador}
+                  </span>
+                  <span className="mt-1 block text-sm">{t("Flete total")}: {usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</span>
+                  <span className="block text-sm">{t("Tránsito")}: {o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")} · {t("Con contingencia")}: {o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen}</span>
+                  <span className="mt-1 flex gap-2 text-xs">
+                    {o.esMasEconomico && <span className="rounded bg-green-100 px-2 py-0.5 text-green-800">{t("Más económico")}</span>}
+                    {o.esMasRapido && <span className="rounded bg-blue-100 px-2 py-0.5 text-blue-800">{t("Más rápido")}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-3 hidden overflow-x-auto sm:block">
               <table className="w-full min-w-[640px] border-collapse text-left">
                 <thead>
                   <tr className="border-b-2 border-acero-claro/30">
