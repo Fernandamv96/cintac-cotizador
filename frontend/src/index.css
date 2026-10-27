@@ -666,7 +666,8 @@ tr.best {
   line-height: 1.25;
 }
 
-.nav-user__datos strong {
+.nav-user__datos strong,
+.nav-user__email {
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;

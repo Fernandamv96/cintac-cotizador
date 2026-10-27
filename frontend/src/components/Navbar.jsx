@@ -305,6 +305,7 @@ export default function Navbar() {
           <span className="nav-user__datos">
             <strong>{usuario.nombre}</strong>
             <small>{translate(usuario.rol.replace("_", " "))}</small>
+            {usuario.email && <small className="nav-user__email" title={usuario.email}>{usuario.email}</small>}
           </span>
           <button
             type="button"
