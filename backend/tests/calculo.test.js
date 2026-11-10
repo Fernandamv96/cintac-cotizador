@@ -124,3 +124,17 @@ test("CP-11 opciones de contenedor: el 20' admite 23 t y el 40' 25 t", () => {
   assert.deepEqual(cantidades(2400000), { 40: 96 });
   assert.throws(() => contenedoresPorTipo({ pesoKg: 0, topes }), /peso en kg mayor que cero/);
 });
+
+test("CP-12 sin valor de la carga: el total es flete + costos locales, sin CIF, arancel ni IVA", () => {
+  const r = calcularCostoImportacion(
+    { valorFOB: 0, moneda: "USD", costosLocales: 500, pesoKg: 50000,
+      fleteMinUSD: 4600, fleteMaxUSD: 7600, transitoMinDias: 25, transitoMaxDias: 32 },
+    PARAMS,
+    950
+  );
+  assert.equal(r.valorCargaInformado, false);
+  assert.deepEqual([r.cifMinUSD, r.arancelMaxUSD, r.ivaMinUSD, r.ivaMaxUSD], [null, null, null, null]);
+  assert.equal(r.totalMinUSD, 5100);
+  assert.equal(r.totalMaxUSD, 8100);
+  assert.equal(r.costoTotalCLP, Math.round(6600 * 950));
+});

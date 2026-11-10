@@ -6,9 +6,9 @@ PostgreSQL en **Neon**, desplegado en **Vercel**.
 
 ## Qué hace
 
-- Calcula los contenedores por peso para cada tipo (el 20' admite **23 t** y el 40'
-  **25 t**, editables) y muestra cada embarcador con las dos opciones y su precio para
-  elegir la que más conviene.
+- Recibe el peso en kilos o en toneladas y calcula los contenedores para cada tipo (el
+  20' admite **23 t** y el 40' **25 t**, editables); muestra cada embarcador con las dos
+  opciones y su precio para elegir la que más conviene.
 - Muestra los puertos de origen y destino agrupados por país.
 - Compara el flete y el tránsito de los embarcadores de una ruta y marca el más
   económico y el más rápido.
@@ -16,6 +16,8 @@ PostgreSQL en **Neon**, desplegado en **Vercel**.
   CIF = FOB + flete (sin seguro) · arancel parametrizable (0 % por TLC) ·
   IVA 19 % sobre CIF + arancel · costos locales opcionales · conversión a CLP con
   el dólar observado (mindicador.cl, con respaldo del último valor guardado).
+  El valor de la carga (FOB) es opcional: si no se conoce, la cotización muestra el
+  flete y los costos locales, sin CIF, arancel ni IVA.
 - Suma el margen de contingencia en días al tránsito.
 - **Tarifas**: Comex edita tarifas, embarcadores y parámetros sin tocar el código;
   cada cambio queda con usuario y fecha y en la auditoría.
@@ -89,7 +91,7 @@ cd backend
 npm install
 cp .env.example .env      # pega DATABASE_URL de Neon, JWT_SECRET y ADMIN_INITIAL_PASSWORD
 npm run db:setup          # crea tablas y datos iniciales (opcional: también ocurre solo)
-npm test                  # 11 pruebas del motor de cálculo (+17 de integración si defines TEST_DATABASE_URL)
+npm test                  # 12 pruebas del motor de cálculo (+18 de integración si defines TEST_DATABASE_URL)
 npm run dev               # http://localhost:4000
 
 cd ../frontend
@@ -102,8 +104,8 @@ se descargan las mismas variables del proyecto.
 
 ## Pruebas
 
-- `npm test`: 11 pruebas unitarias del motor de cálculo.
-- `TEST_DATABASE_URL=postgres://... npm test`: además 17 pruebas de integración de la API contra una base
+- `npm test`: 12 pruebas unitarias del motor de cálculo.
+- `TEST_DATABASE_URL=postgres://... npm test`: además 18 pruebas de integración de la API contra una base
   de pruebas **separada** (se borra y recrea en cada ejecución; nunca uses la de producción).
 - `BASE_URL=... CLAVE=... node tests/carga.mjs`: prueba de carga con 1, 10, 25 y 50 usuarios simultáneos.
 - GitHub Actions (`.github/workflows/ci.yml`) ejecuta todo lo anterior, salvo la carga, en cada Pull Request.

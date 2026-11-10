@@ -111,7 +111,7 @@ export async function crearCotizacion(req, res) {
         cantidadContenedores: estimacion.cantidadContenedores,
         modoContenedor: modoContenedor === "manual" ? "manual" : "peso",
         pesoKg: Number(cantidad),
-        valorFOB: numeroNoNegativo(precioFOB, "El valor FOB"),
+        valorFOB: numeroNoNegativo(precioFOB, "El valor de la carga"),
         moneda: moneda === "CLP" ? "CLP" : "USD",
         costosLocales: numeroNoNegativo(otrosGastos, "Los costos locales"),
         margenDias: margen,

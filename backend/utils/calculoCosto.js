@@ -8,6 +8,8 @@
 //   * IVA 19 % sobre CIF + arancel (base imponible del IVA de importación en Chile;
 //     con arancel 0 % equivale a "19 % del CIF", como lo planteó el cliente).
 //   * Costos locales opcionales, se suman al final.
+//   * Valor de la carga (FOB) opcional: sin él no se pueden calcular CIF, arancel ni
+//     IVA, y el total queda en flete + costos locales.
 //   * Margen de contingencia en días sobre el tránsito.
 //
 // Las funciones de este archivo son puras (sin base de datos ni red) para poder
@@ -87,8 +89,12 @@ export function calcularCostoImportacion(entrada, parametros, tipoCambio) {
   const aUSD = (monto) => (entrada.moneda === "CLP" ? Number(monto || 0) / tc : Number(monto || 0));
   const fobUSD = aUSD(entrada.valorFOB);
   const costosLocalesUSD = aUSD(entrada.costosLocales);
+  const conValorCarga = fobUSD > 0;
 
   const escenario = (fleteUSD) => {
+    if (!conValorCarga) {
+      return { fleteUSD, cifUSD: null, arancelUSD: null, ivaUSD: null, totalUSD: fleteUSD + costosLocalesUSD };
+    }
     const cifUSD = fobUSD + fleteUSD;
     const arancelUSD = cifUSD * arancel;
     const ivaUSD = (cifUSD + arancelUSD) * iva;
@@ -100,19 +106,21 @@ export function calcularCostoImportacion(entrada, parametros, tipoCambio) {
   const medio = escenario((Number(entrada.fleteMinUSD) + Number(entrada.fleteMaxUSD)) / 2);
   const margen = Math.max(0, Math.trunc(Number(entrada.margenDias || 0)));
   const peso = Number(entrada.pesoKg);
+  const redondearSiHay = (n) => (n === null ? null : redondear2(n));
 
   return {
     tipoCambioUsado: tc,
     arancelPctUsado: arancel,
     ivaPctUsado: iva,
+    valorCargaInformado: conValorCarga,
     valorFOBUSD: redondear2(fobUSD),
     costosLocalesUSD: redondear2(costosLocalesUSD),
-    cifMinUSD: redondear2(minimo.cifUSD),
-    cifMaxUSD: redondear2(maximo.cifUSD),
-    arancelMinUSD: redondear2(minimo.arancelUSD),
-    arancelMaxUSD: redondear2(maximo.arancelUSD),
-    ivaMinUSD: redondear2(minimo.ivaUSD),
-    ivaMaxUSD: redondear2(maximo.ivaUSD),
+    cifMinUSD: redondearSiHay(minimo.cifUSD),
+    cifMaxUSD: redondearSiHay(maximo.cifUSD),
+    arancelMinUSD: redondearSiHay(minimo.arancelUSD),
+    arancelMaxUSD: redondearSiHay(maximo.arancelUSD),
+    ivaMinUSD: redondearSiHay(minimo.ivaUSD),
+    ivaMaxUSD: redondearSiHay(maximo.ivaUSD),
     totalMinUSD: redondear2(minimo.totalUSD),
     totalMaxUSD: redondear2(maximo.totalUSD),
     totalUSD: redondear2(medio.totalUSD),

@@ -20,17 +20,23 @@ const rango = (a, b, fmt) => (a === undefined || a === null ? "-" : `${fmt(a)} �
 // Una sola lista de filas para PDF, Excel (CSV) y Word, con el desglose que pide
 // la HDU-08: ruta, embarcador, contenedores, costos, tipo de cambio, fecha y usuario.
 function obtenerFilasCotizacion(c) {
+  // Las cotizaciones calculadas antes de que el valor fuera opcional no traen la marca.
+  const conValorCarga = c.valorCargaInformado !== false;
   return [
     ["Embarcador", c.proveedor || "-"],
     ["Ruta", `${c.puertoOrigen || "-"} a ${c.puertoDestino || "-"} (${c.tipoRuta || "-"})`],
-    ["Peso", `${Number(c.cantidad || 0).toLocaleString("es-CL")} kg`],
+    ["Peso", `${Number(c.cantidad || 0).toLocaleString("es-CL")} kg (${(Number(c.cantidad || 0) / 1000).toLocaleString("es-CL", { maximumFractionDigits: 3 })} t)`],
     ["Contenedores", `${c.cantidadContenedores ?? "-"} × ${c.tipoContenedor ?? "-"}' (tope ${c.toneladasPorContenedor ?? 25} t por contenedor${c.contenedoresModificados ? ", cantidad modificada manualmente" : ""})`],
     ["Tarifa por contenedor", rango(c.tarifaFleteMinPorContenedorUSD, c.tarifaFleteMaxPorContenedorUSD, usd)],
     ["Flete total", rango(c.tarifaFleteMinUSD, c.tarifaFleteMaxUSD, usd)],
-    ["Valor FOB", `${Number(c.precioFOB || 0).toLocaleString("es-CL")} ${c.moneda || "USD"}`],
-    ["CIF (FOB + flete)", rango(c.cifMinUSD, c.cifMaxUSD, usd)],
-    ["Arancel", `${pct(c.arancelPctUsado)} · ${rango(c.arancelMinUSD, c.arancelMaxUSD, usd)}`],
-    ["IVA", `${pct(c.ivaPctUsado)} · ${rango(c.ivaMinUSD, c.ivaMaxUSD, usd)}`],
+    ["Valor de la carga (FOB)", conValorCarga ? `${Number(c.precioFOB || 0).toLocaleString("es-CL")} ${c.moneda || "USD"}` : "No informado"],
+    ...(conValorCarga
+      ? [
+          ["CIF (FOB + flete)", rango(c.cifMinUSD, c.cifMaxUSD, usd)],
+          ["Arancel", `${pct(c.arancelPctUsado)} · ${rango(c.arancelMinUSD, c.arancelMaxUSD, usd)}`],
+          ["IVA", `${pct(c.ivaPctUsado)} · ${rango(c.ivaMinUSD, c.ivaMaxUSD, usd)}`],
+        ]
+      : [["CIF, arancel e IVA", "No calculados: falta el valor de la carga"]]),
     ["Costos locales", usd(c.costosLocalesUSD)],
     ["Total en dólares", rango(c.totalMinUSD, c.totalMaxUSD, usd)],
     ["Tipo de cambio", c.tipoCambioUsado ? `${clp(c.tipoCambioUsado)} (${c.fuenteTipoCambio || "mindicador.cl"}, ${c.fechaTipoCambio ? new Date(c.fechaTipoCambio).toLocaleDateString("es-CL") : "-"})` : "-"],

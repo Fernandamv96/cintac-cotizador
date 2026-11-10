@@ -210,7 +210,7 @@ test("IT-14 un token alterado o revocado por cierre de sesión no sirve", { skip
   assert.equal((await llamar("/cotizaciones", { token })).status, 401);
 });
 
-// IT-16 e IT-17 van antes de IT-15 porque esa prueba deja bloqueado el inicio de sesión.
+// IT-16 a IT-18 van antes de IT-15 porque esa prueba deja bloqueado el inicio de sesión.
 test("IT-16 catálogo: los puertos vienen agrupados por país", { skip: omitir }, async () => {
   const token = await iniciarSesion(ADMIN);
   const { datos } = await llamar("/cotizaciones/catalogo", { token });
@@ -244,6 +244,24 @@ test("IT-17 cada embarcador ofrece 20' (máx. 23 t) y 40' (máx. 25 t) y se guar
   const sinTipo = await llamar("/cotizaciones", { metodo: "POST", token, cuerpo });
   assert.equal(sinTipo.datos.tipoContenedor, "40");
   assert.equal(sinTipo.datos.cantidadContenedores, 2);
+});
+
+test("IT-18 sin valor de la carga la cotización se calcula solo con flete y costos locales", { skip: omitir }, async () => {
+  const token = await iniciarSesion(ADMIN);
+  const creada = await llamar("/cotizaciones", {
+    metodo: "POST",
+    token,
+    cuerpo: { proveedor: "Delpa Group", tipoContenedor: "40", puertoOrigen: "Shanghai", puertoDestino: "Valparaiso", cantidad: 50000, otrosGastos: 300 },
+  });
+  assert.equal(creada.status, 201);
+  const { status, datos } = await llamar(`/cotizaciones/${creada.datos._id}/calcular`, { metodo: "POST", token });
+  assert.equal(status, 200);
+  const c = datos.cotizacion;
+  assert.equal(c.valorCargaInformado, false);
+  assert.equal(c.cifMinUSD, null);
+  assert.equal(c.ivaMinUSD, null);
+  assert.equal(c.totalMinUSD, 4700 + 300);
+  assert.equal(c.costoTotalMinCLP, Math.round(c.totalMinUSD * c.tipoCambioUsado));
 });
 
 test("IT-15 fuerza bruta: el inicio de sesión se bloquea tras 20 intentos en 15 minutos", { skip: omitir }, async () => {

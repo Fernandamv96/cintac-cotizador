@@ -12,6 +12,7 @@ const CAMPOS_INICIALES = {
   puertoOrigen: "",
   puertoDestino: "",
   cantidad: "",
+  unidadPeso: "kg",
   margenDias: "",
   precioFOB: "",
   moneda: "USD",
@@ -23,6 +24,13 @@ function agruparPorEmbarcador(opciones) {
   const grupos = new Map();
   for (const opcion of opciones) grupos.set(opcion.embarcador, [...(grupos.get(opcion.embarcador) || []), opcion]);
   return [...grupos];
+}
+
+// El peso se escribe en kg o en toneladas; al servidor siempre se envía en kg.
+function pesoEnKg({ cantidad, unidadPeso }) {
+  if (cantidad === "") return NaN;
+  const valor = Number(cantidad);
+  return unidadPeso === "t" ? Math.round(valor * 1000) : valor;
 }
 
 export default function NuevaCotizacion() {
@@ -54,7 +62,7 @@ export default function NuevaCotizacion() {
 
   // Compara los embarcadores de la ruta cada vez que cambia la carga (HDU-01, HDU-02, HDU-03).
   useEffect(() => {
-    const peso = Number(form.cantidad);
+    const peso = pesoEnKg(form);
     if (!form.puertoOrigen || !form.puertoDestino || !Number.isFinite(peso) || peso <= 0) {
       setComparacion(null);
       setErrorTarifa("");
@@ -87,9 +95,16 @@ export default function NuevaCotizacion() {
       vigente = false;
       window.clearTimeout(timer);
     };
-  }, [form.puertoOrigen, form.puertoDestino, form.cantidad]);
+  }, [form.puertoOrigen, form.puertoDestino, form.cantidad, form.unidadPeso]);
 
   const actualizarCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
+  // Al cambiar de unidad se convierte lo ya escrito (50000 kg pasa a 50 t y viceversa).
+  const cambiarUnidadPeso = (unidad) =>
+    setForm((prev) => {
+      const valor = Number(prev.cantidad);
+      if (prev.unidadPeso === unidad || prev.cantidad === "" || !Number.isFinite(valor)) return { ...prev, unidadPeso: unidad };
+      return { ...prev, unidadPeso: unidad, cantidad: String(unidad === "t" ? valor / 1000 : Math.round(valor * 1000)) };
+    });
   const elegirOpcion = (o) => setForm((prev) => ({ ...prev, proveedor: o.embarcador, tipoContenedor: o.tipoContenedor }));
   const esElegida = (o) => form.proveedor === o.embarcador && form.tipoContenedor === o.tipoContenedor;
   const margen = Number.parseInt(form.margenDias, 10) || 0;
@@ -105,7 +120,7 @@ export default function NuevaCotizacion() {
     try {
       const nueva = await api.crearCotizacion({
         ...form,
-        cantidad: Number(form.cantidad),
+        cantidad: pesoEnKg(form),
         precioFOB: Number(form.precioFOB || 0),
         otrosGastos: Number(form.otrosGastos || 0),
         margenDias: form.margenDias === "" ? undefined : Number(form.margenDias),
@@ -150,7 +165,7 @@ export default function NuevaCotizacion() {
     setCotizacion(null);
     setAdvertencia("");
     setError("");
-    setForm((prev) => ({ ...CAMPOS_INICIALES, margenDias: String(catalogo?.parametros?.margen_contingencia_dias ?? 0), puertoOrigen: prev.puertoOrigen, puertoDestino: prev.puertoDestino }));
+    setForm((prev) => ({ ...CAMPOS_INICIALES, margenDias: String(catalogo?.parametros?.margen_contingencia_dias ?? 0), puertoOrigen: prev.puertoOrigen, puertoDestino: prev.puertoDestino, unidadPeso: prev.unidadPeso }));
   }
 
   const bloqueado = Boolean(cotizacion);
@@ -158,6 +173,9 @@ export default function NuevaCotizacion() {
   const tope40 = catalogo?.parametros?.toneladas_por_contenedor ?? 25;
   const ivaPct = Math.round((catalogo?.parametros?.iva ?? 0.19) * 100);
   const arancelPct = Math.round((catalogo?.parametros?.arancel ?? 0) * 1000) / 10;
+  const peso = pesoEnKg(form);
+  // Las cotizaciones calculadas antes de esta opción no traen la marca: se tratan como informadas.
+  const conValorCarga = cotizacion?.valorCargaInformado !== false;
   const grupos = comparacion ? agruparPorEmbarcador(comparacion.opciones) : [];
   const elegida = comparacion?.opciones.find(esElegida);
   const insignias = (o) => (
@@ -202,11 +220,21 @@ export default function NuevaCotizacion() {
               </select>
             </div>
             <div>
-              <label htmlFor="cantidad">{t("Peso de la carga (kg)")}</label>
-              <input id="cantidad" type="number" min="1" step="1" inputMode="numeric" required disabled={bloqueado}
-                value={form.cantidad} onChange={(e) => actualizarCampo("cantidad", e.target.value)}
-                placeholder={t("Ej: 50000 (son 50 toneladas)")} />
+              <label htmlFor="cantidad">{t("Peso de la carga")}</label>
+              <div className="flex gap-2">
+                <input id="cantidad" type="number" required disabled={bloqueado}
+                  min={form.unidadPeso === "t" ? "0.001" : "1"} step={form.unidadPeso === "t" ? "0.001" : "1"}
+                  inputMode={form.unidadPeso === "t" ? "decimal" : "numeric"}
+                  value={form.cantidad} onChange={(e) => actualizarCampo("cantidad", e.target.value)}
+                  placeholder={form.unidadPeso === "t" ? t("Ej: 50 (son 50.000 kg)") : t("Ej: 50000 (son 50 toneladas)")} />
+                <select aria-label={t("Unidad de peso")} className="!w-36 shrink-0" disabled={bloqueado}
+                  value={form.unidadPeso} onChange={(e) => cambiarUnidadPeso(e.target.value)}>
+                  <option value="kg">{t("Kilos (kg)")}</option>
+                  <option value="t">{t("Toneladas (t)")}</option>
+                </select>
+              </div>
               <p className="mt-1 text-sm text-acero-claro">
+                {peso > 0 && `= ${form.unidadPeso === "t" ? `${num(peso)} kg` : `${num(peso / 1000, 3)} t`} · `}
                 {t("Con este peso se calculan los contenedores de 20' (máx. {a} t) y de 40' (máx. {b} t).", { a: tope20, b: tope40 })}
               </p>
             </div>
@@ -304,12 +332,15 @@ export default function NuevaCotizacion() {
               )}
             </div>
             <div>
-              <label htmlFor="precioFOB">{t("Valor FOB total de la mercadería")}</label>
+              <label htmlFor="precioFOB">{t("Valor de la carga (opcional)")}</label>
               <input id="precioFOB" type="number" min="0" step="0.01" inputMode="decimal" disabled={bloqueado}
                 value={form.precioFOB} onChange={(e) => actualizarCampo("precioFOB", e.target.value)} placeholder="Ej: 35000" />
+              <p className="mt-1 text-sm text-acero-claro">
+                {t("Valor FOB de la mercadería. Si lo conoces, se usa para calcular CIF, arancel e IVA; si no, la cotización muestra el flete y los costos locales.")}
+              </p>
             </div>
             <div>
-              <label htmlFor="moneda">{t("Moneda del valor FOB y costos locales")}</label>
+              <label htmlFor="moneda">{t("Moneda del valor de la carga y costos locales")}</label>
               <select id="moneda" disabled={bloqueado} value={form.moneda} onChange={(e) => actualizarCampo("moneda", e.target.value)}>
                 <option value="USD">{t("Dólares (USD)")}</option>
                 <option value="CLP">{t("Pesos chilenos (CLP)")}</option>
@@ -341,7 +372,7 @@ export default function NuevaCotizacion() {
         <section className="tarjeta mt-6">
           <h3 className="text-lg">{t("2. Costo de internación")}</h3>
           <p className="mt-2 text-acero-claro">
-            {cotizacion.proveedor} · {cotizacion.puertoOrigen} → {cotizacion.puertoDestino} · {cotizacion.cantidadContenedores} × {cotizacion.tipoContenedor}' · {num(cotizacion.cantidad)} kg
+            {cotizacion.proveedor} · {cotizacion.puertoOrigen} → {cotizacion.puertoDestino} · {cotizacion.cantidadContenedores} × {cotizacion.tipoContenedor}' · {num(cotizacion.cantidad)} kg ({num(cotizacion.cantidad / 1000, 3)} t)
           </p>
           {cotizacion.estado === "en_proceso" ? (
             <button onClick={manejarCalculo} disabled={cargando} className="btn-primario mt-4">
@@ -359,11 +390,17 @@ export default function NuevaCotizacion() {
                 </thead>
                 <tbody>
                   {[
-                    [t("Valor FOB"), usd(cotizacion.valorFOBUSD), usd(cotizacion.valorFOBUSD)],
+                    conValorCarga
+                      ? [t("Valor de la carga (FOB)"), usd(cotizacion.valorFOBUSD), usd(cotizacion.valorFOBUSD)]
+                      : [t("Valor de la carga (FOB)"), t("No informado"), ""],
                     [t("Flete"), usd(cotizacion.tarifaFleteMinUSD), usd(cotizacion.tarifaFleteMaxUSD)],
-                    [t("CIF (FOB + flete)"), usd(cotizacion.cifMinUSD), usd(cotizacion.cifMaxUSD)],
-                    [`${t("Arancel")} ${(cotizacion.arancelPctUsado * 100).toFixed(1)} %`, usd(cotizacion.arancelMinUSD), usd(cotizacion.arancelMaxUSD)],
-                    [`${t("IVA")} ${(cotizacion.ivaPctUsado * 100).toFixed(0)} %`, usd(cotizacion.ivaMinUSD), usd(cotizacion.ivaMaxUSD)],
+                    ...(conValorCarga
+                      ? [
+                          [t("CIF (FOB + flete)"), usd(cotizacion.cifMinUSD), usd(cotizacion.cifMaxUSD)],
+                          [`${t("Arancel")} ${(cotizacion.arancelPctUsado * 100).toFixed(1)} %`, usd(cotizacion.arancelMinUSD), usd(cotizacion.arancelMaxUSD)],
+                          [`${t("IVA")} ${(cotizacion.ivaPctUsado * 100).toFixed(0)} %`, usd(cotizacion.ivaMinUSD), usd(cotizacion.ivaMaxUSD)],
+                        ]
+                      : []),
                     [t("Costos locales"), usd(cotizacion.costosLocalesUSD), usd(cotizacion.costosLocalesUSD)],
                     [t("Total US$"), usd(cotizacion.totalMinUSD), usd(cotizacion.totalMaxUSD)],
                     [t("Total CLP"), clp(cotizacion.costoTotalMinCLP), clp(cotizacion.costoTotalMaxCLP)],
@@ -376,6 +413,11 @@ export default function NuevaCotizacion() {
                   ))}
                 </tbody>
               </table>
+              {!conValorCarga && (
+                <p className="aviso mt-3">
+                  {t("Sin valor de la carga: el total incluye solo el flete y los costos locales. CIF, arancel e IVA se calculan cuando se informa el valor.")}
+                </p>
+              )}
               <div className="mt-4 space-y-1">
                 <p className="text-2xl font-display font-semibold text-acero">
                   {t("Costo total estimado:")} {clp(cotizacion.costoTotalCLP)}

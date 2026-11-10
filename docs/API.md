@@ -29,8 +29,8 @@ el encabezado `Authorization: Bearer <token>` que entrega el inicio de sesión. 
 | --- | --- | --- | --- |
 | GET | `/cotizaciones/catalogo` | Autenticado | Embarcadores activos, puertos de origen y destino (también agrupados por país en `origenesPorPais` y `destinosPorPais`) y parámetros vigentes. |
 | GET | `/cotizaciones/tarifa?puertoOrigen&puertoDestino&cantidad` | Autenticado | Calcula cuántos contenedores de 20' (máx. 23 t) y de 40' (máx. 25 t) necesita el peso (`contenedores`) y devuelve una opción por embarcador activo y tipo, con su flete (`opciones`), marcando la más económica y la más rápida. Opcionales, solo para pruebas: `tipoContenedor=20\|40`, `modoContenedor=manual&cantidadContenedores=n`. |
-| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador y el contenedor elegidos (`proveedor`, `tipoContenedor`; si falta el tipo, la opción más barata del embarcador). Estado `en_proceso`. |
-| POST | `/cotizaciones/:id/calcular` | Dueño o ADMIN | Calcula CIF, arancel, IVA, total en US$ y CLP y tránsito con contingencia (estado `calculada`). |
+| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador y el contenedor elegidos (`proveedor`, `tipoContenedor`; si falta el tipo, la opción más barata del embarcador). `cantidad` va en kg y el valor de la carga (`precioFOB`) es opcional. Estado `en_proceso`. |
+| POST | `/cotizaciones/:id/calcular` | Dueño o ADMIN | Calcula CIF, arancel, IVA, total en US$ y CLP y tránsito con contingencia (estado `calculada`). Sin valor de la carga, `valorCargaInformado` es `false`, CIF/arancel/IVA vuelven en `null` y el total es flete + costos locales. |
 | POST | `/cotizaciones/:id/finalizar` | Dueño o ADMIN | Marca la cotización como `finalizada`. |
 | GET | `/cotizaciones?proveedor&puertoOrigen&puertoDestino` | Autenticado | Historial (propio; JEFE y ADMIN ven todo). Máximo 200, del más reciente al más antiguo. |
 | GET | `/cotizaciones/:id` | Dueño, JEFE o ADMIN | Una cotización. |
