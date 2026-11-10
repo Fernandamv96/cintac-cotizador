@@ -210,6 +210,34 @@ test("IT-14 un token alterado o revocado por cierre de sesión no sirve", { skip
   assert.equal((await llamar("/cotizaciones", { token })).status, 401);
 });
 
+// IT-16 e IT-17 van antes de IT-15 porque esa prueba deja bloqueado el inicio de sesión.
+test("IT-16 catálogo: los puertos vienen agrupados por país", { skip: omitir }, async () => {
+  const token = await iniciarSesion(ADMIN);
+  const { datos } = await llamar("/cotizaciones/catalogo", { token });
+  assert.deepEqual(datos.origenesPorPais.map((g) => g.pais), ["China", "Corea del Sur", "Japón", "Singapur", "Vietnam"]);
+  assert.deepEqual(datos.origenesPorPais[0].puertos, ["Ningbo", "Qingdao", "Shanghai", "Shenzhen / Yantian", "Tianjin"]);
+  assert.deepEqual(datos.destinosPorPais, [{ pais: "Chile", puertos: ["San Antonio", "Valparaiso"] }]);
+});
+
+test("IT-17 contenedores automáticos: cada embarcador usa el de menor flete y la cotización lo guarda", { skip: omitir }, async () => {
+  const token = await iniciarSesion(ADMIN);
+  const { status, datos } = await llamar("/cotizaciones/tarifa?puertoOrigen=Shanghai&puertoDestino=Valparaiso&cantidad=50000", { token });
+  assert.equal(status, 200);
+  assert.equal(datos.cantidadContenedores, 2);
+  assert.equal(datos.tipoContenedor, "20");
+  assert.ok(datos.opciones.every((o) => o.tipoContenedor === "20"));
+  assert.equal(datos.opciones[0].tarifaFleteMinUSD, 3300);
+  const creada = await llamar("/cotizaciones", {
+    metodo: "POST",
+    token,
+    cuerpo: { proveedor: "Delpa Group", puertoOrigen: "Shanghai", puertoDestino: "Valparaiso", cantidad: 50000, precioFOB: 35000 },
+  });
+  assert.equal(creada.status, 201);
+  assert.equal(creada.datos.tipoContenedor, "20");
+  assert.equal(creada.datos.cantidadContenedores, 2);
+  assert.equal(creada.datos.tarifaFleteMinUSD, 3300);
+});
+
 test("IT-15 fuerza bruta: el inicio de sesión se bloquea tras 20 intentos en 15 minutos", { skip: omitir }, async () => {
   let bloqueado = null;
   for (let i = 1; i <= 25 && !bloqueado; i += 1) {

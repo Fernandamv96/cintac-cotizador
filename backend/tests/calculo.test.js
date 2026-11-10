@@ -2,7 +2,12 @@
 // Caso de referencia: Tabla 17 del informe (valores ilustrativos).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calcularContenedores, calcularCostoImportacion, estimarFlete } from "../utils/calculoCosto.js";
+import {
+  calcularContenedores,
+  calcularCostoImportacion,
+  elegirTarifaMasConveniente,
+  estimarFlete,
+} from "../utils/calculoCosto.js";
 
 const PARAMS = { iva: 0.19, arancel: 0 };
 
@@ -105,4 +110,16 @@ test("CP-10 tipo de cambio inválido detiene el cálculo", () => {
     () => calcularCostoImportacion({ valorFOB: 1, pesoKg: 1, fleteMinUSD: 1, fleteMaxUSD: 1 }, PARAMS, 0),
     /Tipo de cambio/
   );
+});
+
+test("CP-11 contenedor automático: se usa el tipo de menor flete del embarcador", () => {
+  const de20 = { tipoContenedor: "20", tarifaMinUSD: 1650, tarifaMaxUSD: 2850, transitoMaxDias: 34 };
+  const de40 = { tipoContenedor: "40", tarifaMinUSD: 2350, tarifaMaxUSD: 3850, transitoMaxDias: 34 };
+  assert.equal(elegirTarifaMasConveniente([de40, de20]).tipoContenedor, "20");
+  // Si Comex desactiva el 20' o el 40' pasa a ser más barato, se usa el 40'.
+  assert.equal(elegirTarifaMasConveniente([de40]).tipoContenedor, "40");
+  assert.equal(elegirTarifaMasConveniente([de20, { ...de40, tarifaMinUSD: 1500, tarifaMaxUSD: 2500 }]).tipoContenedor, "40");
+  // A igual flete gana el de menor tránsito.
+  assert.equal(elegirTarifaMasConveniente([{ ...de20, transitoMaxDias: 40 }, { ...de40, tarifaMinUSD: 1650, tarifaMaxUSD: 2850 }]).tipoContenedor, "40");
+  assert.equal(elegirTarifaMasConveniente([]), null);
 });

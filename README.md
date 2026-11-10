@@ -6,7 +6,9 @@ PostgreSQL en **Neon**, desplegado en **Vercel**.
 
 ## Qué hace
 
-- Calcula los contenedores a partir del peso (tope de **25 t** por contenedor, editable).
+- Elige los contenedores solo: la cantidad sale del peso (tope de **25 t** por contenedor,
+  editable) y el tipo (20' o 40') es el de menor flete de cada embarcador.
+- Muestra los puertos de origen y destino agrupados por país.
 - Compara el flete y el tránsito de los embarcadores de una ruta y marca el más
   económico y el más rápido.
 - Calcula el costo de internación con las reglas de Comex:
@@ -86,7 +88,7 @@ cd backend
 npm install
 cp .env.example .env      # pega DATABASE_URL de Neon, JWT_SECRET y ADMIN_INITIAL_PASSWORD
 npm run db:setup          # crea tablas y datos iniciales (opcional: también ocurre solo)
-npm test                  # 10 pruebas del motor de cálculo (+15 de integración si defines TEST_DATABASE_URL)
+npm test                  # 11 pruebas del motor de cálculo (+17 de integración si defines TEST_DATABASE_URL)
 npm run dev               # http://localhost:4000
 
 cd ../frontend
@@ -99,8 +101,8 @@ se descargan las mismas variables del proyecto.
 
 ## Pruebas
 
-- `npm test`: 10 pruebas unitarias del motor de cálculo.
-- `TEST_DATABASE_URL=postgres://... npm test`: además 15 pruebas de integración de la API contra una base
+- `npm test`: 11 pruebas unitarias del motor de cálculo.
+- `TEST_DATABASE_URL=postgres://... npm test`: además 17 pruebas de integración de la API contra una base
   de pruebas **separada** (se borra y recrea en cada ejecución; nunca uses la de producción).
 - `BASE_URL=... CLAVE=... node tests/carga.mjs`: prueba de carga con 1, 10, 25 y 50 usuarios simultáneos.
 - GitHub Actions (`.github/workflows/ci.yml`) ejecuta todo lo anterior, salvo la carga, en cada Pull Request.

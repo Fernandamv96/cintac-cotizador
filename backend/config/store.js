@@ -258,16 +258,25 @@ const SELECT_TARIFAS = `
   JOIN embarcadores e ON e.id = t.embarcador_id
   LEFT JOIN usuarios u ON u.id = t.modificado_por`;
 
+// [{ pais: "China", puertos: ["Ningbo", ...] }, ...] para agrupar los selectores por país.
+function agruparPorPais(puertos) {
+  const grupos = new Map();
+  for (const { nombre, pais } of puertos) grupos.set(pais, [...(grupos.get(pais) || []), nombre]);
+  return [...grupos].map(([pais, nombres]) => ({ pais, puertos: nombres }));
+}
+
 export async function obtenerCatalogo() {
   const [embarcadores, origenes, destinos] = await Promise.all([
     query("SELECT id, nombre, activo FROM embarcadores ORDER BY nombre"),
-    query("SELECT nombre, pais FROM puertos WHERE tipo = 'origen' ORDER BY nombre"),
-    query("SELECT nombre, pais FROM puertos WHERE tipo = 'destino' ORDER BY nombre"),
+    query("SELECT nombre, pais FROM puertos WHERE tipo = 'origen' ORDER BY pais, nombre"),
+    query("SELECT nombre, pais FROM puertos WHERE tipo = 'destino' ORDER BY pais, nombre"),
   ]);
   return {
     embarcadores: embarcadores.rows,
     puertosOrigen: origenes.rows.map((p) => p.nombre),
     puertosDestino: destinos.rows.map((p) => p.nombre),
+    origenesPorPais: agruparPorPais(origenes.rows),
+    destinosPorPais: agruparPorPais(destinos.rows),
   };
 }
 

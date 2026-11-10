@@ -34,6 +34,8 @@ export async function obtenerCatalogoCotizacion(_req, res) {
       embarcadores: catalogo.embarcadores.filter((e) => e.activo).map((e) => e.nombre),
       puertosOrigen: catalogo.puertosOrigen,
       puertosDestino: catalogo.puertosDestino,
+      origenesPorPais: catalogo.origenesPorPais,
+      destinosPorPais: catalogo.destinosPorPais,
       parametros: Object.fromEntries(parametros.map((p) => [p.nombre, p.valor])),
     });
   } catch (error) {

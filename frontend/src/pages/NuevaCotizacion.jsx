@@ -2,15 +2,14 @@ import React, { useEffect, useState } from "react";
 import { api } from "../api/api.js";
 import { exportarCotizacion } from "../utils/exportPdf.js";
 import { LOCALES, useLanguage } from "../api/LanguageContext.jsx";
+import OpcionesPuertos from "../components/OpcionesPuertos.jsx";
 
+// Los contenedores no se piden: el servidor los calcula por peso y elige el tipo por embarcador.
 const CAMPOS_INICIALES = {
   proveedor: "",
   puertoOrigen: "",
   puertoDestino: "",
   cantidad: "",
-  tipoContenedor: "40",
-  modoContenedor: "peso",
-  cantidadContenedores: "1",
   margenDias: "",
   precioFOB: "",
   moneda: "USD",
@@ -60,9 +59,6 @@ export default function NuevaCotizacion() {
           puertoOrigen: form.puertoOrigen,
           puertoDestino: form.puertoDestino,
           cantidad: peso,
-          tipoContenedor: form.tipoContenedor,
-          modoContenedor: form.modoContenedor,
-          cantidadContenedores: form.cantidadContenedores,
         });
         if (!vigente) return;
         setComparacion(datos);
@@ -81,7 +77,7 @@ export default function NuevaCotizacion() {
       vigente = false;
       window.clearTimeout(timer);
     };
-  }, [form.puertoOrigen, form.puertoDestino, form.cantidad, form.tipoContenedor, form.modoContenedor, form.cantidadContenedores]);
+  }, [form.puertoOrigen, form.puertoDestino, form.cantidad]);
 
   const actualizarCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
   const margen = Number.parseInt(form.margenDias, 10) || 0;
@@ -101,7 +97,6 @@ export default function NuevaCotizacion() {
         precioFOB: Number(form.precioFOB || 0),
         otrosGastos: Number(form.otrosGastos || 0),
         margenDias: form.margenDias === "" ? undefined : Number(form.margenDias),
-        cantidadContenedores: Number(form.cantidadContenedores),
       });
       setCotizacion(nueva);
     } catch (err) {
@@ -174,7 +169,7 @@ export default function NuevaCotizacion() {
               <select id="puertoOrigen" required disabled={bloqueado} value={form.puertoOrigen}
                 onChange={(e) => actualizarCampo("puertoOrigen", e.target.value)}>
                 <option value="">{t("Selecciona puerto de origen")}</option>
-                {(catalogo?.puertosOrigen || []).map((p) => <option key={p} value={p}>{p}</option>)}
+                <OpcionesPuertos grupos={catalogo?.origenesPorPais} />
               </select>
             </div>
             <div>
@@ -182,7 +177,7 @@ export default function NuevaCotizacion() {
               <select id="puertoDestino" required disabled={bloqueado} value={form.puertoDestino}
                 onChange={(e) => actualizarCampo("puertoDestino", e.target.value)}>
                 <option value="">{t("Selecciona puerto de destino")}</option>
-                {(catalogo?.puertosDestino || []).map((p) => <option key={p} value={p}>{p}</option>)}
+                <OpcionesPuertos grupos={catalogo?.destinosPorPais} />
               </select>
             </div>
             <div>
@@ -190,37 +185,10 @@ export default function NuevaCotizacion() {
               <input id="cantidad" type="number" min="1" step="1" inputMode="numeric" required disabled={bloqueado}
                 value={form.cantidad} onChange={(e) => actualizarCampo("cantidad", e.target.value)}
                 placeholder={t("Ej: 50000 (son 50 toneladas)")} />
+              <p className="mt-1 text-sm text-acero-claro">
+                {t("Los contenedores se calculan solos con este peso (tope de {t} t por contenedor).", { t: tope })}
+              </p>
             </div>
-            <div>
-              <label htmlFor="tipoContenedor">{t("Tipo de contenedor")}</label>
-              <select id="tipoContenedor" disabled={bloqueado} value={form.tipoContenedor}
-                onChange={(e) => actualizarCampo("tipoContenedor", e.target.value)}>
-                <option value="20">20'</option>
-                <option value="40">40'</option>
-              </select>
-            </div>
-            <fieldset className="sm:col-span-2">
-              <legend className="mb-2 text-sm font-semibold text-acero">{t("Cantidad de contenedores")}</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--borde)] p-3">
-                  <input className="!h-4 !w-4" type="radio" name="modoContenedor" value="peso" disabled={bloqueado}
-                    checked={form.modoContenedor === "peso"} onChange={() => actualizarCampo("modoContenedor", "peso")} />
-                  <span>{t("Calcular por peso (tope de {t} t por contenedor)", { t: tope })}</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--borde)] p-3">
-                  <input className="!h-4 !w-4" type="radio" name="modoContenedor" value="manual" disabled={bloqueado}
-                    checked={form.modoContenedor === "manual"} onChange={() => actualizarCampo("modoContenedor", "manual")} />
-                  <span>{t("Ingresar la cantidad manualmente")}</span>
-                </label>
-              </div>
-              {form.modoContenedor === "manual" && (
-                <div className="mt-3 max-w-xs">
-                  <label htmlFor="cantidadContenedores">{t("Contenedores")}</label>
-                  <input id="cantidadContenedores" type="number" min="1" max="100" step="1" disabled={bloqueado}
-                    value={form.cantidadContenedores} onChange={(e) => actualizarCampo("cantidadContenedores", e.target.value)} />
-                </div>
-              )}
-            </fieldset>
             <div>
               <label htmlFor="margenDias">{t("Margen de contingencia (días)")}</label>
               <input id="margenDias" type="number" min="0" max="365" step="1" disabled={bloqueado}
@@ -265,11 +233,16 @@ export default function NuevaCotizacion() {
         {comparacion && (
           <>
             <p className="mt-2 text-acero-claro">
-              {t("{ton} t → {n} contenedor(es) de {tipo}'", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores, tipo: comparacion.tipoContenedor })}
-              {comparacion.contenedoresModificados && ` · ${t("modificado manualmente (sugerido: {s})", { s: comparacion.contenedoresSugeridos })}`}
+              {comparacion.tipoContenedor
+                ? t("{ton} t → {n} contenedor(es) de {tipo}'", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores, tipo: comparacion.tipoContenedor })
+                : t("{ton} t → {n} contenedor(es)", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores })}
+              {` · ${t("tope de {t} t por contenedor", { t: comparacion.toneladasPorContenedor })}`}
+            </p>
+            <p className="mt-1 text-sm text-acero-claro">
+              {t("Contenedores elegidos automáticamente: la cantidad sale del peso y el tipo es el de menor flete de cada embarcador.")}
             </p>
             {/* En pantallas angostas cada embarcador se muestra como tarjeta (sin desplazamiento horizontal). */}
-            <div className="mt-3 space-y-3 sm:hidden">
+            <div className="mt-3 space-y-3 md:hidden">
               {comparacion.opciones.map((o) => (
                 <label key={o.embarcador}
                   className={`block cursor-pointer rounded-md border p-3 ${form.proveedor === o.embarcador ? "border-naranja bg-naranja/10" : "border-[var(--borde)]"}`}>
@@ -278,7 +251,10 @@ export default function NuevaCotizacion() {
                       checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
                     {o.embarcador}
                   </span>
-                  <span className="mt-1 block text-sm">{t("Flete total")}: {usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</span>
+                  <span className="mt-1 block text-sm">
+                    {t("Contenedores")}: {comparacion.cantidadContenedores} × {o.tipoContenedor}' ({usd(o.tarifaFleteMinPorContenedorUSD)} – {usd(o.tarifaFleteMaxPorContenedorUSD)} {t("c/u")})
+                  </span>
+                  <span className="block text-sm">{t("Flete total")}: {usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</span>
                   <span className="block text-sm">{t("Tránsito")}: {o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")} · {t("Con contingencia")}: {o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen}</span>
                   <span className="mt-1 flex gap-2 text-xs">
                     {o.esMasEconomico && <span className="rounded bg-green-100 px-2 py-0.5 text-green-800">{t("Más económico")}</span>}
@@ -287,12 +263,13 @@ export default function NuevaCotizacion() {
                 </label>
               ))}
             </div>
-            <div className="mt-3 hidden overflow-x-auto sm:block">
+            <div className="mt-3 hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] border-collapse text-left">
                 <thead>
                   <tr className="border-b-2 border-acero-claro/30">
                     <th className="py-2 pr-3"></th>
                     <th className="py-2 pr-3">{t("Embarcador")}</th>
+                    <th className="py-2 pr-3">{t("Contenedores")}</th>
                     <th className="py-2 pr-3">{t("Flete total")}</th>
                     <th className="py-2 pr-3">{t("Tránsito")}</th>
                     <th className="py-2 pr-3">{t("Con contingencia")}</th>
@@ -307,6 +284,12 @@ export default function NuevaCotizacion() {
                           checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
                       </td>
                       <td className="py-2 pr-3 font-medium">{o.embarcador}</td>
+                      <td className="py-2 pr-3">
+                        {comparacion.cantidadContenedores} × {o.tipoContenedor}'
+                        <span className="block text-xs text-acero-claro">
+                          {usd(o.tarifaFleteMinPorContenedorUSD)} – {usd(o.tarifaFleteMaxPorContenedorUSD)} {t("c/u")}
+                        </span>
+                      </td>
                       <td className="py-2 pr-3">{usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</td>
                       <td className="py-2 pr-3">{o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")}</td>
                       <td className="py-2 pr-3">{o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen} {t("días")}</td>

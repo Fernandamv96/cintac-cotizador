@@ -1,6 +1,8 @@
 // Motor de cálculo del costo de importación marítima, con las reglas que
 // entregó Comex en la reunión de levantamiento (septiembre 2026):
 //   * Contenedores = techo(peso en toneladas ÷ tope por contenedor), tope 25 t.
+//   * Tipo de contenedor automático: el tope es el mismo para 20' y 40', así que la
+//     cantidad no cambia y se usa el tipo con menor flete de cada embarcador.
 //   * Flete = tarifa por contenedor × cantidad de contenedores (rango mín–máx, US$).
 //   * El seguro NO se considera (lo toma Cintac directamente): CIF = FOB + flete.
 //   * Arancel ad valorem parametrizable (0 % por defecto, por TLC) sobre el CIF.
@@ -50,6 +52,18 @@ export function estimarFlete(tarifa, cantidadContenedores) {
     tiempoTransitoMinDias: tarifa.transitoMinDias,
     tiempoTransitoMaxDias: tarifa.transitoMaxDias,
   };
+}
+
+// Elige el contenedor de un embarcador entre sus tarifas activas de la ruta: la de menor
+// flete promedio; si empatan, la de menor tránsito y luego la de 20'.
+export function elegirTarifaMasConveniente(tarifas) {
+  if (!tarifas.length) return null;
+  return [...tarifas].sort(
+    (a, b) =>
+      a.tarifaMinUSD + a.tarifaMaxUSD - (b.tarifaMinUSD + b.tarifaMaxUSD) ||
+      a.transitoMaxDias - b.transitoMaxDias ||
+      Number(a.tipoContenedor) - Number(b.tipoContenedor)
+  )[0];
 }
 
 // entrada: { valorFOB, moneda, costosLocales, pesoKg, fleteMinUSD, fleteMaxUSD,

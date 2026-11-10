@@ -27,9 +27,9 @@ el encabezado `Authorization: Bearer <token>` que entrega el inicio de sesión. 
 
 | Método | Ruta | Acceso | Qué hace |
 | --- | --- | --- | --- |
-| GET | `/cotizaciones/catalogo` | Autenticado | Embarcadores activos, puertos de origen y destino y parámetros vigentes. |
-| GET | `/cotizaciones/tarifa?puertoOrigen&puertoDestino&cantidad&tipoContenedor&modoContenedor&cantidadContenedores` | Autenticado | Calcula contenedores (tope 25 t) y compara el flete de todos los embarcadores activos de la ruta. |
-| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador elegido (estado `en_proceso`). |
+| GET | `/cotizaciones/catalogo` | Autenticado | Embarcadores activos, puertos de origen y destino (también agrupados por país en `origenesPorPais` y `destinosPorPais`) y parámetros vigentes. |
+| GET | `/cotizaciones/tarifa?puertoOrigen&puertoDestino&cantidad` | Autenticado | Calcula los contenedores por peso (tope 25 t) y compara el flete de todos los embarcadores activos de la ruta; cada uno usa el tipo de contenedor de menor flete (`tipoContenedor` en cada opción). Opcionales, solo para pruebas: `tipoContenedor=20\|40`, `modoContenedor=manual&cantidadContenedores=n`. |
+| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador elegido (estado `en_proceso`); los contenedores se eligen igual que en la comparación. |
 | POST | `/cotizaciones/:id/calcular` | Dueño o ADMIN | Calcula CIF, arancel, IVA, total en US$ y CLP y tránsito con contingencia (estado `calculada`). |
 | POST | `/cotizaciones/:id/finalizar` | Dueño o ADMIN | Marca la cotización como `finalizada`. |
 | GET | `/cotizaciones?proveedor&puertoOrigen&puertoDestino` | Autenticado | Historial (propio; JEFE y ADMIN ven todo). Máximo 200, del más reciente al más antiguo. |

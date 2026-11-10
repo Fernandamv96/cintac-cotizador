@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "../api/api.js";
 import { LOCALES, useLanguage } from "../api/LanguageContext.jsx";
+import OpcionesPuertos from "../components/OpcionesPuertos.jsx";
 
 const NOMBRES_PARAMETROS = {
   iva: { etiqueta: "IVA", ayuda: "Proporción: 0.19 = 19 %", paso: "0.01" },
@@ -163,11 +164,11 @@ export default function Tarifas() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <select aria-label={t("Puerto de origen")} value={filtro.puertoOrigen} onChange={(e) => setFiltro((f) => ({ ...f, puertoOrigen: e.target.value }))}>
             <option value="">{t("Todos los orígenes")}</option>
-            {(datos?.puertosOrigen || []).map((p) => <option key={p} value={p}>{p}</option>)}
+            <OpcionesPuertos grupos={datos?.origenesPorPais} />
           </select>
           <select aria-label={t("Puerto de destino")} value={filtro.puertoDestino} onChange={(e) => setFiltro((f) => ({ ...f, puertoDestino: e.target.value }))}>
             <option value="">{t("Todos los destinos")}</option>
-            {(datos?.puertosDestino || []).map((p) => <option key={p} value={p}>{p}</option>)}
+            <OpcionesPuertos grupos={datos?.destinosPorPais} />
           </select>
         </div>
         <div className="mt-4 overflow-x-auto">
