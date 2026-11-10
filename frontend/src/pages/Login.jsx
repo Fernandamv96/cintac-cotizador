@@ -335,7 +335,7 @@ export default function Login() {
           <ShinyText>{translate("Compara embarcadores, calcula contenedores e internación en CLP con el dólar del día.")}</ShinyText>
         </p>
         <div className="login-features">
-          <SpotlightCard><strong>25 t</strong><span>{translate("por contenedor, editable")}</span></SpotlightCard>
+          <SpotlightCard><strong>20' · 40'</strong><span>{translate("máx. 23 t y 25 t")}</span></SpotlightCard>
           <SpotlightCard><strong>CIF + IVA</strong><span>{translate("según reglas de Comex")}</span></SpotlightCard>
           <SpotlightCard><strong>PDF · Excel</strong><span>{translate("exporta el desglose")}</span></SpotlightCard>
         </div>
