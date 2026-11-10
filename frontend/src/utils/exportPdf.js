@@ -38,7 +38,6 @@ function obtenerFilasCotizacion(c) {
     ["Total en pesos (punto medio)", clp(c.costoTotalCLP)],
     ["Costo por kg", c.precioUnitarioFinalCLP ? clp(c.precioUnitarioFinalCLP) : "-"],
     ["Tránsito", `${c.tiempoTransitoMinDias ?? "-"}–${c.tiempoTransitoMaxDias ?? "-"} días + ${c.margenDias ?? 0} de contingencia = ${c.transitoConMargenMinDias ?? "-"}–${c.transitoConMargenMaxDias ?? "-"} días`],
-    ["Condición de pago", c.condicionPago || "-"],
     ["Fuente de la tarifa", c.fuenteTarifa || "-"],
     ["Cotizado por", `${c.creadoPorNombre || "-"} · ${c.createdAt ? new Date(c.createdAt).toLocaleString("es-CL") : "-"}`],
     ["Nota", "Estimación referencial: no incluye recargos BAF/GRI ni gastos portuarios salvo los costos locales ingresados."],

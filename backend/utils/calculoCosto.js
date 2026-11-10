@@ -1,8 +1,7 @@
 // Motor de cálculo del costo de importación marítima, con las reglas que
 // entregó Comex en la reunión de levantamiento (septiembre 2026):
-//   * Contenedores = techo(peso en toneladas ÷ tope por contenedor), tope 25 t.
-//   * Tipo de contenedor automático: el tope es el mismo para 20' y 40', así que la
-//     cantidad no cambia y se usa el tipo con menor flete de cada embarcador.
+//   * Contenedores = techo(peso en toneladas ÷ tope del tipo): el 20' admite 23 t y el
+//     40' 25 t, así que se calculan las dos opciones y el usuario elige la que conviene.
 //   * Flete = tarifa por contenedor × cantidad de contenedores (rango mín–máx, US$).
 //   * El seguro NO se considera (lo toma Cintac directamente): CIF = FOB + flete.
 //   * Arancel ad valorem parametrizable (0 % por defecto, por TLC) sobre el CIF.
@@ -54,16 +53,22 @@ export function estimarFlete(tarifa, cantidadContenedores) {
   };
 }
 
-// Elige el contenedor de un embarcador entre sus tarifas activas de la ruta: la de menor
-// flete promedio; si empatan, la de menor tránsito y luego la de 20'.
-export function elegirTarifaMasConveniente(tarifas) {
-  if (!tarifas.length) return null;
-  return [...tarifas].sort(
-    (a, b) =>
-      a.tarifaMinUSD + a.tarifaMaxUSD - (b.tarifaMinUSD + b.tarifaMaxUSD) ||
-      a.transitoMaxDias - b.transitoMaxDias ||
-      Number(a.tipoContenedor) - Number(b.tipoContenedor)
-  )[0];
+// Contenedores que necesita la carga con cada tipo, según su tope: topes = { 20: 23, 40: 25 }.
+// Un tipo que no sirve (por ejemplo, más de 100 contenedores) queda fuera; si no sirve
+// ninguno, se informa el error.
+export function contenedoresPorTipo({ pesoKg, topes, modo = "peso", cantidadManual }) {
+  const resultado = {};
+  let primerError = null;
+  for (const [tipo, tope] of Object.entries(topes)) {
+    try {
+      const contenedores = calcularContenedores({ pesoKg, toneladasPorContenedor: tope, modo, cantidadManual });
+      resultado[tipo] = { ...contenedores, tope: Number(tope) };
+    } catch (error) {
+      primerError = primerError || error;
+    }
+  }
+  if (!Object.keys(resultado).length) throw primerError;
+  return resultado;
 }
 
 // entrada: { valorFOB, moneda, costosLocales, pesoKg, fleteMinUSD, fleteMaxUSD,

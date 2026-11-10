@@ -28,8 +28,8 @@ el encabezado `Authorization: Bearer <token>` que entrega el inicio de sesión. 
 | Método | Ruta | Acceso | Qué hace |
 | --- | --- | --- | --- |
 | GET | `/cotizaciones/catalogo` | Autenticado | Embarcadores activos, puertos de origen y destino (también agrupados por país en `origenesPorPais` y `destinosPorPais`) y parámetros vigentes. |
-| GET | `/cotizaciones/tarifa?puertoOrigen&puertoDestino&cantidad` | Autenticado | Calcula los contenedores por peso (tope 25 t) y compara el flete de todos los embarcadores activos de la ruta; cada uno usa el tipo de contenedor de menor flete (`tipoContenedor` en cada opción). Opcionales, solo para pruebas: `tipoContenedor=20\|40`, `modoContenedor=manual&cantidadContenedores=n`. |
-| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador elegido (estado `en_proceso`); los contenedores se eligen igual que en la comparación. |
+| GET | `/cotizaciones/tarifa?puertoOrigen&puertoDestino&cantidad` | Autenticado | Calcula cuántos contenedores de 20' (máx. 23 t) y de 40' (máx. 25 t) necesita el peso (`contenedores`) y devuelve una opción por embarcador activo y tipo, con su flete (`opciones`), marcando la más económica y la más rápida. Opcionales, solo para pruebas: `tipoContenedor=20\|40`, `modoContenedor=manual&cantidadContenedores=n`. |
+| POST | `/cotizaciones` | Autenticado | Guarda una cotización con el embarcador y el contenedor elegidos (`proveedor`, `tipoContenedor`; si falta el tipo, la opción más barata del embarcador). Estado `en_proceso`. |
 | POST | `/cotizaciones/:id/calcular` | Dueño o ADMIN | Calcula CIF, arancel, IVA, total en US$ y CLP y tránsito con contingencia (estado `calculada`). |
 | POST | `/cotizaciones/:id/finalizar` | Dueño o ADMIN | Marca la cotización como `finalizada`. |
 | GET | `/cotizaciones?proveedor&puertoOrigen&puertoDestino` | Autenticado | Historial (propio; JEFE y ADMIN ven todo). Máximo 200, del más reciente al más antiguo. |
@@ -43,7 +43,7 @@ el encabezado `Authorization: Bearer <token>` que entrega el inicio de sesión. 
 | --- | --- | --- | --- |
 | GET | `/tarifas?puertoOrigen&puertoDestino` | Autenticado | Tarifas con ruta, embarcador, contenedor, quién y cuándo las modificó; también catálogo y parámetros. |
 | PUT | `/tarifas/:id` | Autenticado | Actualiza mínimo, máximo, tránsito, fuente y si está activa. Valida mínimo ≤ máximo. |
-| PUT | `/tarifas/parametros/:nombre` | Autenticado | Cambia `iva` (0–1), `arancel` (0–1), `toneladas_por_contenedor` (1–40) o `margen_contingencia_dias` (0–365). |
+| PUT | `/tarifas/parametros/:nombre` | Autenticado | Cambia `iva` (0–1), `arancel` (0–1), `toneladas_por_contenedor_20` (tope del 20', 1–40), `toneladas_por_contenedor` (tope del 40', 1–40) o `margen_contingencia_dias` (0–365). |
 | POST | `/tarifas/embarcadores` | Autenticado | Agrega un embarcador y le copia tarifas referenciales inactivas. |
 | PATCH | `/tarifas/embarcadores/:id` | Autenticado | Cambia nombre o activa/desactiva un embarcador. |
 

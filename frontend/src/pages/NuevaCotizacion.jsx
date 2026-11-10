@@ -4,9 +4,11 @@ import { exportarCotizacion } from "../utils/exportPdf.js";
 import { LOCALES, useLanguage } from "../api/LanguageContext.jsx";
 import OpcionesPuertos from "../components/OpcionesPuertos.jsx";
 
-// Los contenedores no se piden: el servidor los calcula por peso y elige el tipo por embarcador.
+// La cantidad de contenedores la calcula el servidor con el peso y el tope de cada tipo;
+// el usuario elige embarcador y contenedor (20' o 40') en la comparación.
 const CAMPOS_INICIALES = {
   proveedor: "",
+  tipoContenedor: "",
   puertoOrigen: "",
   puertoDestino: "",
   cantidad: "",
@@ -14,8 +16,14 @@ const CAMPOS_INICIALES = {
   precioFOB: "",
   moneda: "USD",
   otrosGastos: "0",
-  condicionPago: "",
 };
+
+// [[embarcador, [opción de 20', opción de 40']], ...] en el orden que entrega el servidor.
+function agruparPorEmbarcador(opciones) {
+  const grupos = new Map();
+  for (const opcion of opciones) grupos.set(opcion.embarcador, [...(grupos.get(opcion.embarcador) || []), opcion]);
+  return [...grupos];
+}
 
 export default function NuevaCotizacion() {
   const { language, t } = useLanguage();
@@ -63,8 +71,10 @@ export default function NuevaCotizacion() {
         if (!vigente) return;
         setComparacion(datos);
         setErrorTarifa("");
-        if (!datos.opciones.some((o) => o.embarcador === form.proveedor)) {
-          setForm((prev) => ({ ...prev, proveedor: datos.opciones[0]?.embarcador || "" }));
+        // Si la opción elegida ya no existe (otra ruta o peso), se propone la más económica.
+        if (!datos.opciones.some((o) => o.embarcador === form.proveedor && o.tipoContenedor === form.tipoContenedor)) {
+          const mejor = datos.opciones.find((o) => o.esMasEconomico) || datos.opciones[0];
+          setForm((prev) => ({ ...prev, proveedor: mejor?.embarcador || "", tipoContenedor: mejor?.tipoContenedor || "" }));
         }
       } catch (err) {
         if (vigente) {
@@ -80,13 +90,15 @@ export default function NuevaCotizacion() {
   }, [form.puertoOrigen, form.puertoDestino, form.cantidad]);
 
   const actualizarCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
+  const elegirOpcion = (o) => setForm((prev) => ({ ...prev, proveedor: o.embarcador, tipoContenedor: o.tipoContenedor }));
+  const esElegida = (o) => form.proveedor === o.embarcador && form.tipoContenedor === o.tipoContenedor;
   const margen = Number.parseInt(form.margenDias, 10) || 0;
 
   async function manejarRegistro(e) {
     e.preventDefault();
     setError("");
-    if (!form.proveedor) {
-      setError("Selecciona un embarcador en la comparación.");
+    if (!form.proveedor || !form.tipoContenedor) {
+      setError("Selecciona un embarcador y un contenedor en la comparación.");
       return;
     }
     setCargando(true);
@@ -142,9 +154,18 @@ export default function NuevaCotizacion() {
   }
 
   const bloqueado = Boolean(cotizacion);
-  const tope = catalogo?.parametros?.toneladas_por_contenedor ?? 25;
+  const tope20 = catalogo?.parametros?.toneladas_por_contenedor_20 ?? 23;
+  const tope40 = catalogo?.parametros?.toneladas_por_contenedor ?? 25;
   const ivaPct = Math.round((catalogo?.parametros?.iva ?? 0.19) * 100);
   const arancelPct = Math.round((catalogo?.parametros?.arancel ?? 0) * 1000) / 10;
+  const grupos = comparacion ? agruparPorEmbarcador(comparacion.opciones) : [];
+  const elegida = comparacion?.opciones.find(esElegida);
+  const insignias = (o) => (
+    <>
+      {o.esMasEconomico && <span className="whitespace-nowrap rounded bg-green-100 px-2 py-0.5 text-green-800">{t("Más económico")}</span>}
+      {o.esMasRapido && <span className="whitespace-nowrap rounded bg-blue-100 px-2 py-0.5 text-blue-800">{t("Más rápido")}</span>}
+    </>
+  );
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">
@@ -159,9 +180,9 @@ export default function NuevaCotizacion() {
         </p>
       )}
 
-      {/* Paso 1: carga y ruta */}
+      {/* Paso 1: carga, ruta y comparación de embarcadores */}
       <section className="tarjeta mt-6">
-        <h3 className="text-lg">{t("1. Carga y ruta")}</h3>
+        <h3 className="text-lg">{t("1. Carga, ruta y embarcador")}</h3>
         <form id="form-cotizacion" onSubmit={manejarRegistro} className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -186,7 +207,7 @@ export default function NuevaCotizacion() {
                 value={form.cantidad} onChange={(e) => actualizarCampo("cantidad", e.target.value)}
                 placeholder={t("Ej: 50000 (son 50 toneladas)")} />
               <p className="mt-1 text-sm text-acero-claro">
-                {t("Los contenedores se calculan solos con este peso (tope de {t} t por contenedor).", { t: tope })}
+                {t("Con este peso se calculan los contenedores de 20' (máx. {a} t) y de 40' (máx. {b} t).", { a: tope20, b: tope40 })}
               </p>
             </div>
             <div>
@@ -194,10 +215,93 @@ export default function NuevaCotizacion() {
               <input id="margenDias" type="number" min="0" max="365" step="1" disabled={bloqueado}
                 value={form.margenDias} onChange={(e) => actualizarCampo("margenDias", e.target.value)} />
             </div>
-            <div>
-              <label htmlFor="condicionPago">{t("Condición de pago")}</label>
-              <input id="condicionPago" disabled={bloqueado} value={form.condicionPago} maxLength={120}
-                onChange={(e) => actualizarCampo("condicionPago", e.target.value)} placeholder={t("Ej: 30 días fecha factura")} />
+            {/* Comparación de embarcadores: cada uno con su opción de 20' y de 40'. */}
+            <div className="rounded-2xl border border-[var(--borde)] p-4 sm:col-span-2">
+              <h4 className="font-semibold">{t("Comparación de embarcadores")}</h4>
+              {!comparacion && !errorTarifa && (
+                <p className="mt-1 text-sm text-acero-claro">{t("Elige origen, destino y peso para ver las tarifas.")}</p>
+              )}
+              {errorTarifa && <p role="alert" className="mt-1 text-peligro">{t(errorTarifa)}</p>}
+              {comparacion && (
+                <>
+                  <p className="mt-1 text-acero-claro">
+                    {num(comparacion.toneladas, 2)} t →{" "}
+                    {comparacion.contenedores
+                      .map((c) => t("{n} × {tipo}' (máx. {t} t c/u)", { n: c.cantidad, tipo: c.tipoContenedor, t: c.toneladasPorContenedor }))
+                      .join(` ${t("o")} `)}
+                  </p>
+                  <p className="mt-1 text-sm text-acero-claro">
+                    {t("Elige el embarcador y el contenedor; la opción más económica viene marcada.")}
+                  </p>
+                  {/* En pantallas angostas cada embarcador se muestra como tarjeta (sin desplazamiento horizontal). */}
+                  <div className="mt-3 space-y-3 md:hidden">
+                    {grupos.map(([embarcador, opciones]) => (
+                      <div key={embarcador} className="rounded-md border border-[var(--borde)] p-3">
+                        <p className="font-semibold">{embarcador}</p>
+                        <div className="mt-2 space-y-2">
+                          {opciones.map((o) => (
+                            <label key={o.tipoContenedor}
+                              className={`block cursor-pointer rounded-md border p-3 ${esElegida(o) ? "border-naranja bg-naranja/10" : "border-[var(--borde)]"}`}>
+                              <span className="flex items-center gap-2 font-medium">
+                                <input className="!h-4 !w-4" type="radio" name="opcion-movil" disabled={bloqueado}
+                                  checked={esElegida(o)} onChange={() => elegirOpcion(o)} />
+                                {o.cantidadContenedores} × {o.tipoContenedor}'
+                                <span className="text-sm font-normal text-acero-claro">({t("máx. {t} t c/u", { t: o.toneladasPorContenedor })})</span>
+                              </span>
+                              <span className="mt-1 block text-sm">{t("Flete total")}: {usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</span>
+                              <span className="block text-sm">{t("Tránsito")}: {o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")} · {t("Con contingencia")}: {o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen}</span>
+                              <span className="mt-1 flex gap-2 text-xs">{insignias(o)}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[640px] border-collapse text-left">
+                      <thead>
+                        <tr className="border-b-2 border-acero-claro/30">
+                          <th className="py-2 pr-3">{t("Embarcador")}</th>
+                          <th className="py-2 pr-3">{t("Contenedor")}</th>
+                          <th className="py-2 pr-3">{t("Flete total")}</th>
+                          <th className="py-2 pr-3">{t("Tránsito")}</th>
+                          <th className="py-2 pr-3">{t("Con contingencia")}</th>
+                          <th className="py-2 pr-3"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grupos.flatMap(([embarcador, opciones]) =>
+                          opciones.map((o, i) => (
+                            <tr key={`${embarcador}-${o.tipoContenedor}`}
+                              className={`border-b ${i === opciones.length - 1 ? "border-acero-claro/30" : "border-acero-claro/10"} ${esElegida(o) ? "bg-naranja/10" : ""}`}>
+                              <td className="py-2 pr-3 font-medium">{i === 0 ? embarcador : ""}</td>
+                              <td className="py-2 pr-3">
+                                <label className="flex cursor-pointer items-center gap-2">
+                                  <input className="!h-4 !w-4" type="radio" name="opcion" disabled={bloqueado}
+                                    aria-label={`${embarcador} ${o.cantidadContenedores} × ${o.tipoContenedor}'`}
+                                    checked={esElegida(o)} onChange={() => elegirOpcion(o)} />
+                                  <span>
+                                    {o.cantidadContenedores} × {o.tipoContenedor}'{" "}
+                                    <span className="text-xs text-acero-claro">({t("máx. {t} t c/u", { t: o.toneladasPorContenedor })})</span>
+                                    <span className="block whitespace-nowrap text-xs text-acero-claro">
+                                      {usd(o.tarifaFleteMinPorContenedorUSD)} – {usd(o.tarifaFleteMaxPorContenedorUSD)} {t("c/u")}
+                                    </span>
+                                  </span>
+                                </label>
+                              </td>
+                              <td className="whitespace-nowrap py-2 pr-3">{usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</td>
+                              <td className="whitespace-nowrap py-2 pr-3">{o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")}</td>
+                              <td className="whitespace-nowrap py-2 pr-3">{o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen} {t("días")}</td>
+                              <td className="py-2 pr-3 text-sm"><span className="flex flex-wrap gap-2">{insignias(o)}</span></td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 text-sm text-acero-claro">{t("Fuente:")} {elegida?.fuenteTarifa || "-"}</p>
+                </>
+              )}
             </div>
             <div>
               <label htmlFor="precioFOB">{t("Valor FOB total de la mercadería")}</label>
@@ -220,102 +324,22 @@ export default function NuevaCotizacion() {
               {t("Reglas de Comex: CIF = FOB + flete (sin seguro). Arancel {a} % e IVA {i} % sobre CIF + arancel. Los valores se cambian en Tarifas.", { a: arancelPct, i: ivaPct })}
             </div>
           </div>
+          {!cotizacion && (
+            <button type="submit" disabled={cargando || !elegida} className="btn-primario w-full">
+              {cargando
+                ? t("Guardando...")
+                : t("Guardar cotización con {e}", {
+                    e: elegida ? `${elegida.embarcador} · ${elegida.cantidadContenedores} × ${elegida.tipoContenedor}'` : "-",
+                  })}
+            </button>
+          )}
         </form>
       </section>
 
-      {/* Paso 2: comparación de embarcadores */}
-      <section className="tarjeta mt-6">
-        <h3 className="text-lg">{t("2. Comparación de embarcadores")}</h3>
-        {!comparacion && !errorTarifa && (
-          <p className="mt-2 text-acero-claro">{t("Elige origen, destino y peso para ver las tarifas.")}</p>
-        )}
-        {errorTarifa && <p role="alert" className="mt-2 text-peligro">{t(errorTarifa)}</p>}
-        {comparacion && (
-          <>
-            <p className="mt-2 text-acero-claro">
-              {comparacion.tipoContenedor
-                ? t("{ton} t → {n} contenedor(es) de {tipo}'", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores, tipo: comparacion.tipoContenedor })
-                : t("{ton} t → {n} contenedor(es)", { ton: num(comparacion.toneladas, 2), n: comparacion.cantidadContenedores })}
-              {` · ${t("tope de {t} t por contenedor", { t: comparacion.toneladasPorContenedor })}`}
-            </p>
-            <p className="mt-1 text-sm text-acero-claro">
-              {t("Contenedores elegidos automáticamente: la cantidad sale del peso y el tipo es el de menor flete de cada embarcador.")}
-            </p>
-            {/* En pantallas angostas cada embarcador se muestra como tarjeta (sin desplazamiento horizontal). */}
-            <div className="mt-3 space-y-3 md:hidden">
-              {comparacion.opciones.map((o) => (
-                <label key={o.embarcador}
-                  className={`block cursor-pointer rounded-md border p-3 ${form.proveedor === o.embarcador ? "border-naranja bg-naranja/10" : "border-[var(--borde)]"}`}>
-                  <span className="flex items-center gap-2 font-semibold">
-                    <input className="!h-4 !w-4" type="radio" name="proveedor-movil" disabled={bloqueado}
-                      checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
-                    {o.embarcador}
-                  </span>
-                  <span className="mt-1 block text-sm">
-                    {t("Contenedores")}: {comparacion.cantidadContenedores} × {o.tipoContenedor}' ({usd(o.tarifaFleteMinPorContenedorUSD)} – {usd(o.tarifaFleteMaxPorContenedorUSD)} {t("c/u")})
-                  </span>
-                  <span className="block text-sm">{t("Flete total")}: {usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</span>
-                  <span className="block text-sm">{t("Tránsito")}: {o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")} · {t("Con contingencia")}: {o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen}</span>
-                  <span className="mt-1 flex gap-2 text-xs">
-                    {o.esMasEconomico && <span className="rounded bg-green-100 px-2 py-0.5 text-green-800">{t("Más económico")}</span>}
-                    {o.esMasRapido && <span className="rounded bg-blue-100 px-2 py-0.5 text-blue-800">{t("Más rápido")}</span>}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="mt-3 hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[640px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b-2 border-acero-claro/30">
-                    <th className="py-2 pr-3"></th>
-                    <th className="py-2 pr-3">{t("Embarcador")}</th>
-                    <th className="py-2 pr-3">{t("Contenedores")}</th>
-                    <th className="py-2 pr-3">{t("Flete total")}</th>
-                    <th className="py-2 pr-3">{t("Tránsito")}</th>
-                    <th className="py-2 pr-3">{t("Con contingencia")}</th>
-                    <th className="py-2 pr-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparacion.opciones.map((o) => (
-                    <tr key={o.embarcador} className={`border-b border-acero-claro/15 ${form.proveedor === o.embarcador ? "bg-naranja/10" : ""}`}>
-                      <td className="py-2 pr-3">
-                        <input className="!h-4 !w-4" type="radio" name="proveedor" aria-label={o.embarcador} disabled={bloqueado}
-                          checked={form.proveedor === o.embarcador} onChange={() => actualizarCampo("proveedor", o.embarcador)} />
-                      </td>
-                      <td className="py-2 pr-3 font-medium">{o.embarcador}</td>
-                      <td className="py-2 pr-3">
-                        {comparacion.cantidadContenedores} × {o.tipoContenedor}'
-                        <span className="block text-xs text-acero-claro">
-                          {usd(o.tarifaFleteMinPorContenedorUSD)} – {usd(o.tarifaFleteMaxPorContenedorUSD)} {t("c/u")}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-3">{usd(o.tarifaFleteMinUSD)} – {usd(o.tarifaFleteMaxUSD)}</td>
-                      <td className="py-2 pr-3">{o.tiempoTransitoMinDias}–{o.tiempoTransitoMaxDias} {t("días")}</td>
-                      <td className="py-2 pr-3">{o.tiempoTransitoMinDias + margen}–{o.tiempoTransitoMaxDias + margen} {t("días")}</td>
-                      <td className="py-2 pr-3 text-sm">
-                        {o.esMasEconomico && <span className="mr-2 rounded bg-green-100 px-2 py-0.5 text-green-800">{t("Más económico")}</span>}
-                        {o.esMasRapido && <span className="rounded bg-blue-100 px-2 py-0.5 text-blue-800">{t("Más rápido")}</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-2 text-sm text-acero-claro">{t("Fuente:")} {comparacion.opciones.find((o) => o.embarcador === form.proveedor)?.fuenteTarifa || "-"}</p>
-          </>
-        )}
-        {!cotizacion && (
-          <button type="submit" form="form-cotizacion" disabled={cargando || !comparacion} className="btn-primario mt-4 w-full">
-            {cargando ? t("Guardando...") : t("Guardar cotización con {e}", { e: form.proveedor || "-" })}
-          </button>
-        )}
-      </section>
-
-      {/* Paso 3: cálculo */}
+      {/* Paso 2: cálculo */}
       {cotizacion && (
         <section className="tarjeta mt-6">
-          <h3 className="text-lg">{t("3. Costo de internación")}</h3>
+          <h3 className="text-lg">{t("2. Costo de internación")}</h3>
           <p className="mt-2 text-acero-claro">
             {cotizacion.proveedor} · {cotizacion.puertoOrigen} → {cotizacion.puertoDestino} · {cotizacion.cantidadContenedores} × {cotizacion.tipoContenedor}' · {num(cotizacion.cantidad)} kg
           </p>
@@ -370,10 +394,10 @@ export default function NuevaCotizacion() {
         </section>
       )}
 
-      {/* Paso 4: exportar */}
+      {/* Paso 3: exportar */}
       {cotizacion && cotizacion.estado !== "en_proceso" && (
         <section className="tarjeta mt-6">
-          <h3 className="text-lg">{t("4. Finalizar y exportar")}</h3>
+          <h3 className="text-lg">{t("3. Finalizar y exportar")}</h3>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div>
               <label htmlFor="tipoExportacion">{t("Formato")}</label>

@@ -48,6 +48,8 @@ export const TARIFAS_REFERENCIA = [
 export const PARAMETROS = [
   { nombre: "iva", valor: 0.19, descripcion: "IVA de importación (19 %), se aplica sobre CIF + arancel" },
   { nombre: "arancel", valor: 0, descripcion: "Arancel ad valorem; 0 % porque casi todo se importa con TLC" },
-  { nombre: "toneladas_por_contenedor", valor: 25, descripcion: "Tope de carga por contenedor indicado por Comex" },
+  // toneladas_por_contenedor es el tope del 40' (conserva su nombre de cuando había un solo tope).
+  { nombre: "toneladas_por_contenedor", valor: 25, descripcion: "Tope de carga por contenedor de 40' indicado por Comex" },
+  { nombre: "toneladas_por_contenedor_20", valor: 23, descripcion: "Tope de carga por contenedor de 20' indicado por Comex" },
   { nombre: "margen_contingencia_dias", valor: 0, descripcion: "Días de contingencia por defecto (confirmar valor con Comex)" },
 ];

@@ -6,8 +6,9 @@ PostgreSQL en **Neon**, desplegado en **Vercel**.
 
 ## Qué hace
 
-- Elige los contenedores solo: la cantidad sale del peso (tope de **25 t** por contenedor,
-  editable) y el tipo (20' o 40') es el de menor flete de cada embarcador.
+- Calcula los contenedores por peso para cada tipo (el 20' admite **23 t** y el 40'
+  **25 t**, editables) y muestra cada embarcador con las dos opciones y su precio para
+  elegir la que más conviene.
 - Muestra los puertos de origen y destino agrupados por país.
 - Compara el flete y el tránsito de los embarcadores de una ruta y marca el más
   económico y el más rápido.

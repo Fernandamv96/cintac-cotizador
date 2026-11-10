@@ -2,10 +2,8 @@
 // Las tarifas ya no están escritas en el código: Comex las mantiene desde la
 // pantalla "Tarifas" (HDU-07).
 import { buscarTarifa, listarTarifas, obtenerValoresParametros } from "../config/store.js";
-import { calcularContenedores, elegirTarifaMasConveniente, estimarFlete } from "./calculoCosto.js";
+import { contenedoresPorTipo, estimarFlete } from "./calculoCosto.js";
 
-// Sin tipo indicado (lo normal desde el formulario) el sistema elige el contenedor;
-// la API acepta 20 o 40 para forzarlo.
 function validarTipo(tipoContenedor) {
   if (tipoContenedor === undefined || tipoContenedor === null || tipoContenedor === "") return null;
   const tipo = String(tipoContenedor);
@@ -13,7 +11,44 @@ function validarTipo(tipoContenedor) {
   return tipo;
 }
 
-// Calcula contenedores y flete para UN embarcador.
+// Contenedores de la carga con cada tipo (o solo con el indicado).
+function contenedoresDeLaCarga({ cantidad, modoContenedor, cantidadContenedores, parametros, tipo }) {
+  const topes = { 20: parametros.toneladas_por_contenedor_20, 40: parametros.toneladas_por_contenedor };
+  return contenedoresPorTipo({
+    pesoKg: cantidad,
+    topes: tipo ? { [tipo]: topes[tipo] } : topes,
+    modo: modoContenedor,
+    cantidadManual: cantidadContenedores,
+  });
+}
+
+// Una opción por tarifa (embarcador × contenedor), con la cantidad que exige ese tipo.
+function armarOpciones(tarifas, contenedores, margen) {
+  return tarifas
+    .filter((tarifa) => contenedores[tarifa.tipoContenedor])
+    .map((tarifa) => {
+      const { cantidad, sugeridos, modificado, toneladas, tope } = contenedores[tarifa.tipoContenedor];
+      const flete = estimarFlete(tarifa, cantidad);
+      return {
+        tarifa,
+        embarcador: tarifa.embarcador,
+        tipoContenedor: tarifa.tipoContenedor,
+        cantidadContenedores: cantidad,
+        contenedoresSugeridos: sugeridos,
+        contenedoresModificados: modificado,
+        toneladas,
+        toneladasPorContenedor: tope,
+        ...flete,
+        fletePromedioUSD: (flete.tarifaFleteMinUSD + flete.tarifaFleteMaxUSD) / 2,
+        transitoConMargenMaxDias: flete.tiempoTransitoMaxDias + margen,
+        fuenteTarifa: tarifa.fuente,
+        tipoRuta: tarifa.tipoRuta,
+      };
+    });
+}
+
+// Calcula contenedores y flete para UN embarcador y el contenedor elegido; sin
+// contenedor indicado se usa la opción más barata del embarcador.
 export async function obtenerEstimacionFlete({
   puertoOrigen,
   puertoDestino,
@@ -25,36 +60,31 @@ export async function obtenerEstimacionFlete({
 }) {
   const tipo = validarTipo(tipoContenedor);
   const parametros = await obtenerValoresParametros();
-  const contenedores = calcularContenedores({
-    pesoKg: cantidad,
-    toneladasPorContenedor: parametros.toneladas_por_contenedor,
-    modo: modoContenedor,
-    cantidadManual: cantidadContenedores,
-  });
-  const tarifa = tipo
-    ? await buscarTarifa({ puertoOrigen, puertoDestino, embarcador, tipoContenedor: tipo })
-    : elegirTarifaMasConveniente(
-        (await listarTarifas({ puertoOrigen, puertoDestino, soloActivas: true })).filter((t) => t.embarcador === embarcador)
-      );
-  if (!tarifa) throw new Error("No hay una tarifa vigente para esa ruta, embarcador y contenedor.");
+  const contenedores = contenedoresDeLaCarga({ cantidad, modoContenedor, cantidadContenedores, parametros, tipo });
+  const tarifas = tipo
+    ? [await buscarTarifa({ puertoOrigen, puertoDestino, embarcador, tipoContenedor: tipo })].filter(Boolean)
+    : (await listarTarifas({ puertoOrigen, puertoDestino, soloActivas: true })).filter((t) => t.embarcador === embarcador);
+  const [opcion] = armarOpciones(tarifas, contenedores, 0).sort((a, b) => a.fletePromedioUSD - b.fletePromedioUSD);
+  if (!opcion) throw new Error("No hay una tarifa vigente para esa ruta, embarcador y contenedor.");
 
   return {
-    tarifa,
+    tarifa: opcion.tarifa,
     estimacion: {
-      tipoContenedor: tarifa.tipoContenedor,
-      cantidadContenedores: contenedores.cantidad,
-      contenedoresSugeridos: contenedores.sugeridos,
-      contenedoresModificados: contenedores.modificado,
-      toneladas: contenedores.toneladas,
-      toneladasPorContenedor: parametros.toneladas_por_contenedor,
-      ...estimarFlete(tarifa, contenedores.cantidad),
-      tipoRuta: tarifa.tipoRuta,
-      fuenteTarifa: tarifa.fuente,
+      tipoContenedor: opcion.tipoContenedor,
+      cantidadContenedores: opcion.cantidadContenedores,
+      contenedoresSugeridos: opcion.contenedoresSugeridos,
+      contenedoresModificados: opcion.contenedoresModificados,
+      toneladas: opcion.toneladas,
+      toneladasPorContenedor: opcion.toneladasPorContenedor,
+      ...estimarFlete(opcion.tarifa, opcion.cantidadContenedores),
+      tipoRuta: opcion.tipoRuta,
+      fuenteTarifa: opcion.fuenteTarifa,
     },
   };
 }
 
-// Compara todos los embarcadores activos de una ruta (HDU-03), cada uno con su contenedor.
+// Compara los embarcadores activos de una ruta (HDU-03): cada uno con su opción de 20'
+// y de 40', para que el usuario elija la que más le conviene.
 export async function compararEmbarcadores({
   puertoOrigen,
   puertoDestino,
@@ -65,51 +95,39 @@ export async function compararEmbarcadores({
 }) {
   const tipo = validarTipo(tipoContenedor);
   const parametros = await obtenerValoresParametros();
-  const contenedores = calcularContenedores({
-    pesoKg: cantidad,
-    toneladasPorContenedor: parametros.toneladas_por_contenedor,
-    modo: modoContenedor,
-    cantidadManual: cantidadContenedores,
-  });
-  const tarifas = (await listarTarifas({ puertoOrigen, puertoDestino, soloActivas: true }))
-    .filter((t) => !tipo || t.tipoContenedor === tipo);
-  if (!tarifas.length) throw new Error("No hay tarifas vigentes para la ruta seleccionada.");
-
-  const tarifasPorEmbarcador = new Map();
-  for (const tarifa of tarifas) {
-    tarifasPorEmbarcador.set(tarifa.embarcador, [...(tarifasPorEmbarcador.get(tarifa.embarcador) || []), tarifa]);
-  }
-
+  const contenedores = contenedoresDeLaCarga({ cantidad, modoContenedor, cantidadContenedores, parametros, tipo });
+  const tarifas = await listarTarifas({ puertoOrigen, puertoDestino, soloActivas: true });
   const margen = Number(parametros.margen_contingencia_dias || 0);
-  const opciones = [...tarifasPorEmbarcador.values()]
-    .map((delEmbarcador) => {
-      const tarifa = elegirTarifaMasConveniente(delEmbarcador);
-      const flete = estimarFlete(tarifa, contenedores.cantidad);
-      return {
-        embarcador: tarifa.embarcador,
-        tipoContenedor: tarifa.tipoContenedor,
-        ...flete,
-        fletePromedioUSD: (flete.tarifaFleteMinUSD + flete.tarifaFleteMaxUSD) / 2,
-        transitoConMargenMaxDias: flete.tiempoTransitoMaxDias + margen,
-        fuenteTarifa: tarifa.fuente,
-        tipoRuta: tarifa.tipoRuta,
-      };
-    })
-    .sort((a, b) => a.fletePromedioUSD - b.fletePromedioUSD);
-  const masBarato = opciones[0].fletePromedioUSD;
+  const opciones = armarOpciones(tarifas, contenedores, margen);
+  if (!opciones.length) throw new Error("No hay tarifas vigentes para la ruta seleccionada.");
+
+  const masBarato = Math.min(...opciones.map((o) => o.fletePromedioUSD));
   const masRapido = Math.min(...opciones.map((o) => o.tiempoTransitoMaxDias));
-  const tipos = new Set(opciones.map((o) => o.tipoContenedor));
+  // Las opciones de un embarcador van juntas (20' y luego 40'); primero el embarcador más barato.
+  const mejorPorEmbarcador = new Map();
+  for (const o of opciones) {
+    mejorPorEmbarcador.set(o.embarcador, Math.min(mejorPorEmbarcador.get(o.embarcador) ?? Infinity, o.fletePromedioUSD));
+  }
+  opciones.sort(
+    (a, b) =>
+      mejorPorEmbarcador.get(a.embarcador) - mejorPorEmbarcador.get(b.embarcador) ||
+      a.embarcador.localeCompare(b.embarcador) ||
+      Number(a.tipoContenedor) - Number(b.tipoContenedor)
+  );
+  const [primero] = Object.values(contenedores);
 
   return {
-    // Tipo común a todos los embarcadores; null si alguno usa otro contenedor.
-    tipoContenedor: tipos.size === 1 ? opciones[0].tipoContenedor : null,
-    cantidadContenedores: contenedores.cantidad,
-    contenedoresSugeridos: contenedores.sugeridos,
-    contenedoresModificados: contenedores.modificado,
-    toneladas: contenedores.toneladas,
-    toneladasPorContenedor: parametros.toneladas_por_contenedor,
+    toneladas: primero.toneladas,
+    contenedores: Object.entries(contenedores).map(([clave, c]) => ({
+      tipoContenedor: clave,
+      cantidad: c.cantidad,
+      toneladasPorContenedor: c.tope,
+    })),
+    // Con un tipo indicado en la consulta se informa también su cantidad directamente.
+    tipoContenedor: tipo,
+    cantidadContenedores: tipo ? contenedores[tipo].cantidad : null,
     margenDiasPorDefecto: margen,
-    opciones: opciones.map((o) => ({
+    opciones: opciones.map(({ tarifa, ...o }) => ({
       ...o,
       esMasEconomico: o.fletePromedioUSD === masBarato,
       esMasRapido: o.tiempoTransitoMaxDias === masRapido,

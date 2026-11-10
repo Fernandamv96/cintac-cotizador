@@ -81,8 +81,8 @@ test("IT-04 catálogo: 3 embarcadores, 9 orígenes, 2 destinos y reglas de Comex
   assert.equal(datos.puertosOrigen.length, 9);
   assert.equal(datos.puertosDestino.length, 2);
   assert.deepEqual(
-    [datos.parametros.iva, datos.parametros.arancel, datos.parametros.toneladas_por_contenedor],
-    [0.19, 0, 25]
+    [datos.parametros.iva, datos.parametros.arancel, datos.parametros.toneladas_por_contenedor, datos.parametros.toneladas_por_contenedor_20],
+    [0.19, 0, 25, 23]
   );
 });
 
@@ -219,23 +219,31 @@ test("IT-16 catálogo: los puertos vienen agrupados por país", { skip: omitir }
   assert.deepEqual(datos.destinosPorPais, [{ pais: "Chile", puertos: ["San Antonio", "Valparaiso"] }]);
 });
 
-test("IT-17 contenedores automáticos: cada embarcador usa el de menor flete y la cotización lo guarda", { skip: omitir }, async () => {
+test("IT-17 cada embarcador ofrece 20' (máx. 23 t) y 40' (máx. 25 t) y se guarda la opción elegida", { skip: omitir }, async () => {
   const token = await iniciarSesion(ADMIN);
   const { status, datos } = await llamar("/cotizaciones/tarifa?puertoOrigen=Shanghai&puertoDestino=Valparaiso&cantidad=50000", { token });
   assert.equal(status, 200);
-  assert.equal(datos.cantidadContenedores, 2);
-  assert.equal(datos.tipoContenedor, "20");
-  assert.ok(datos.opciones.every((o) => o.tipoContenedor === "20"));
-  assert.equal(datos.opciones[0].tarifaFleteMinUSD, 3300);
-  const creada = await llamar("/cotizaciones", {
-    metodo: "POST",
-    token,
-    cuerpo: { proveedor: "Delpa Group", puertoOrigen: "Shanghai", puertoDestino: "Valparaiso", cantidad: 50000, precioFOB: 35000 },
-  });
-  assert.equal(creada.status, 201);
-  assert.equal(creada.datos.tipoContenedor, "20");
-  assert.equal(creada.datos.cantidadContenedores, 2);
-  assert.equal(creada.datos.tarifaFleteMinUSD, 3300);
+  assert.deepEqual(datos.contenedores, [
+    { tipoContenedor: "20", cantidad: 3, toneladasPorContenedor: 23 },
+    { tipoContenedor: "40", cantidad: 2, toneladasPorContenedor: 25 },
+  ]);
+  assert.equal(datos.opciones.length, 6);
+  const delpa20 = datos.opciones.find((o) => o.embarcador === "Delpa Group" && o.tipoContenedor === "20");
+  assert.equal(delpa20.cantidadContenedores, 3);
+  assert.equal(delpa20.tarifaFleteMinUSD, 3 * 1650);
+  // 2 × 40' (US$ 4.700–7.700) sale más barato que 3 × 20' (US$ 4.950–8.550).
+  assert.ok(datos.opciones.filter((o) => o.esMasEconomico).every((o) => o.tipoContenedor === "40"));
+
+  const cuerpo = { proveedor: "Delpa Group", puertoOrigen: "Shanghai", puertoDestino: "Valparaiso", cantidad: 50000, precioFOB: 35000 };
+  const elegida = await llamar("/cotizaciones", { metodo: "POST", token, cuerpo: { ...cuerpo, tipoContenedor: "20" } });
+  assert.equal(elegida.status, 201);
+  assert.equal(elegida.datos.tipoContenedor, "20");
+  assert.equal(elegida.datos.cantidadContenedores, 3);
+  assert.equal(elegida.datos.tarifaFleteMinUSD, 4950);
+  // Sin contenedor indicado se guarda la opción más barata del embarcador.
+  const sinTipo = await llamar("/cotizaciones", { metodo: "POST", token, cuerpo });
+  assert.equal(sinTipo.datos.tipoContenedor, "40");
+  assert.equal(sinTipo.datos.cantidadContenedores, 2);
 });
 
 test("IT-15 fuerza bruta: el inicio de sesión se bloquea tras 20 intentos en 15 minutos", { skip: omitir }, async () => {

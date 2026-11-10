@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   calcularContenedores,
   calcularCostoImportacion,
-  elegirTarifaMasConveniente,
+  contenedoresPorTipo,
   estimarFlete,
 } from "../utils/calculoCosto.js";
 
@@ -112,14 +112,15 @@ test("CP-10 tipo de cambio inválido detiene el cálculo", () => {
   );
 });
 
-test("CP-11 contenedor automático: se usa el tipo de menor flete del embarcador", () => {
-  const de20 = { tipoContenedor: "20", tarifaMinUSD: 1650, tarifaMaxUSD: 2850, transitoMaxDias: 34 };
-  const de40 = { tipoContenedor: "40", tarifaMinUSD: 2350, tarifaMaxUSD: 3850, transitoMaxDias: 34 };
-  assert.equal(elegirTarifaMasConveniente([de40, de20]).tipoContenedor, "20");
-  // Si Comex desactiva el 20' o el 40' pasa a ser más barato, se usa el 40'.
-  assert.equal(elegirTarifaMasConveniente([de40]).tipoContenedor, "40");
-  assert.equal(elegirTarifaMasConveniente([de20, { ...de40, tarifaMinUSD: 1500, tarifaMaxUSD: 2500 }]).tipoContenedor, "40");
-  // A igual flete gana el de menor tránsito.
-  assert.equal(elegirTarifaMasConveniente([{ ...de20, transitoMaxDias: 40 }, { ...de40, tarifaMinUSD: 1650, tarifaMaxUSD: 2850 }]).tipoContenedor, "40");
-  assert.equal(elegirTarifaMasConveniente([]), null);
+test("CP-11 opciones de contenedor: el 20' admite 23 t y el 40' 25 t", () => {
+  const topes = { 20: 23, 40: 25 };
+  const cantidades = (pesoKg) =>
+    Object.fromEntries(Object.entries(contenedoresPorTipo({ pesoKg, topes })).map(([tipo, c]) => [tipo, c.cantidad]));
+  assert.deepEqual(cantidades(50000), { 20: 3, 40: 2 });
+  assert.deepEqual(cantidades(46000), { 20: 2, 40: 2 });
+  assert.deepEqual(cantidades(23000), { 20: 1, 40: 1 });
+  assert.deepEqual(cantidades(23001), { 20: 2, 40: 1 });
+  // Si un tipo supera los 100 contenedores, queda solo el otro.
+  assert.deepEqual(cantidades(2400000), { 40: 96 });
+  assert.throws(() => contenedoresPorTipo({ pesoKg: 0, topes }), /peso en kg mayor que cero/);
 });

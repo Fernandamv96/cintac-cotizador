@@ -17,6 +17,7 @@ const LIMITES_PARAMETROS = {
   iva: { min: 0, max: 1, mensaje: "El IVA debe estar entre 0 y 1 (por ejemplo 0.19)." },
   arancel: { min: 0, max: 1, mensaje: "El arancel debe estar entre 0 y 1 (por ejemplo 0.06)." },
   toneladas_por_contenedor: { min: 1, max: 40, mensaje: "El tope debe estar entre 1 y 40 toneladas." },
+  toneladas_por_contenedor_20: { min: 1, max: 40, mensaje: "El tope debe estar entre 1 y 40 toneladas." },
   margen_contingencia_dias: { min: 0, max: 365, entero: true, mensaje: "El margen debe ser un entero entre 0 y 365 días." },
 };
 

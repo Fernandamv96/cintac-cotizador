@@ -8,9 +8,12 @@ import OpcionesPuertos from "../components/OpcionesPuertos.jsx";
 const NOMBRES_PARAMETROS = {
   iva: { etiqueta: "IVA", ayuda: "Proporción: 0.19 = 19 %", paso: "0.01" },
   arancel: { etiqueta: "Arancel", ayuda: "0 con TLC; 0.06 = 6 %", paso: "0.001" },
-  toneladas_por_contenedor: { etiqueta: "Tope por contenedor (t)", ayuda: "Comex indicó 25 t", paso: "1" },
+  toneladas_por_contenedor_20: { etiqueta: "Tope por contenedor de 20' (t)", ayuda: "Comex indicó 23 t", paso: "1" },
+  toneladas_por_contenedor: { etiqueta: "Tope por contenedor de 40' (t)", ayuda: "Comex indicó 25 t", paso: "1" },
   margen_contingencia_dias: { etiqueta: "Margen de contingencia por defecto (días)", ayuda: "Se puede cambiar en cada cotización", paso: "1" },
 };
+// Los parámetros se muestran en el orden de NOMBRES_PARAMETROS (el 20' antes que el 40').
+const ORDEN_PARAMETROS = Object.keys(NOMBRES_PARAMETROS);
 
 export default function Tarifas() {
   const { language, t } = useLanguage();
@@ -124,7 +127,9 @@ export default function Tarifas() {
       <section className="tarjeta mt-6">
         <h3 className="text-lg">{t("Parámetros de cálculo")}</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {(datos?.parametros || []).map((p) => (
+          {[...(datos?.parametros || [])]
+            .sort((a, b) => ORDEN_PARAMETROS.indexOf(a.nombre) - ORDEN_PARAMETROS.indexOf(b.nombre))
+            .map((p) => (
             <div key={p.nombre}>
               <label htmlFor={`param-${p.nombre}`}>{t(NOMBRES_PARAMETROS[p.nombre]?.etiqueta || p.nombre)}</label>
               <div className="flex gap-2">
