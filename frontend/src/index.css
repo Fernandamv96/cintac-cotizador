@@ -161,9 +161,15 @@ input[type="radio"] {
   accent-color: var(--naranja);
 }
 
-select option {
+select option,
+select optgroup {
   background: var(--fondo);
   color: var(--texto);
+}
+
+/* Encabezados de país en los selectores de puertos. */
+select optgroup {
+  color: var(--naranja-texto);
 }
 
 input::placeholder,

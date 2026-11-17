@@ -139,8 +139,7 @@ function Footer() {
         </div>
 
         <div className="site-footer__socials">
-          <a href="https://www.facebook.com/CINTAC" target="_blank" rel="noreferrer" aria-label={t("Facebook CINTAC")}>f</a>
-          <a href="https://www.instagram.com/cintaccl/" target="_blank" rel="noreferrer" aria-label={t("Instagram CINTAC")}>◎</a>
+          <a href="https://www.instagram.com/cintacchile/" target="_blank" rel="noreferrer" aria-label={t("Instagram CINTAC")}>◎</a>
           <a href="https://www.linkedin.com/company/cintac" target="_blank" rel="noreferrer" aria-label={t("LinkedIn CINTAC")}>in</a>
         </div>
       </div>
