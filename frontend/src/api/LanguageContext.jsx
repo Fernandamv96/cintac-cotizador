@@ -233,6 +233,22 @@ const translations = {
   "Configuración actualizada correctamente.": ["Settings updated successfully.", "Настройки успешно обновлены.", "设置已更新。", "設定を更新しました。"],
   "Configuración guardada correctamente.": ["Settings saved successfully.", "Настройки успешно сохранены.", "设置已保存。", "設定を保存しました。"],
   "Error de servidor.": ["Server error.", "Ошибка сервера.", "服务器错误。", "サーバーエラー。"],
+  "Elige si importas o exportas, ingresa la carga, compara los embarcadores y calcula el costo.": ["Choose import or export, enter the cargo, compare the carriers and calculate the cost.", "Выберите импорт или экспорт, введите груз, сравните перевозчиков и рассчитайте стоимость.", "选择进口或出口，输入货物，比较承运人并计算成本。", "輸入か輸出かを選び、貨物を入力し、船会社を比較して費用を計算します。"],
+  "Tipo de operación": ["Operation type", "Тип операции", "业务类型", "取引の種類"],
+  "Importación": ["Import", "Импорт", "进口", "輸入"],
+  "Exportación": ["Export", "Экспорт", "出口", "輸出"],
+  "La carga llega a Chile desde el extranjero. Se calcula CIF, arancel e IVA.": ["Cargo arrives in Chile from abroad. CIF, duty and VAT are calculated.", "Груз прибывает в Чили из-за рубежа. Рассчитываются CIF, пошлина и НДС.", "货物从国外运抵智利。计算CIF、关税和增值税。", "貨物は海外からチリに到着します。CIF、関税、付加価値税を計算します。"],
+  "La carga sale de Chile al extranjero. Exenta de IVA y sin arancel: precio CFR.": ["Cargo leaves Chile for abroad. VAT-exempt and duty-free: CFR price.", "Груз отправляется из Чили за рубеж. Без НДС и пошлины: цена CFR.", "货物从智利运往国外。免增值税、无关税：CFR价格。", "貨物はチリから海外へ出荷されます。付加価値税免除・関税なし：CFR価格。"],
+  "Valor FOB de venta de la mercadería. Si lo conoces, se suma el flete para obtener el precio CFR; si no, la cotización muestra el flete y los costos locales.": ["FOB sale value of the goods. If you know it, freight is added to get the CFR price; otherwise the quote shows freight and local costs.", "Стоимость товара FOB. Если она известна, к ней добавляется фрахт для цены CFR; иначе показываются фрахт и местные расходы.", "货物的FOB销售价值。如已知，加上运费得到CFR价格；否则报价显示运费和当地费用。", "商品のFOB販売価格。分かれば運賃を加えてCFR価格を算出し、分からなければ運賃と現地費用を表示します。"],
+  "Exportación: CFR = FOB + flete (sin seguro). Exenta de IVA y sin arancel en Chile; los impuestos del país de destino los paga el comprador.": ["Export: CFR = FOB + freight (no insurance). VAT-exempt and duty-free in Chile; destination taxes are paid by the buyer.", "Экспорт: CFR = FOB + фрахт (без страховки). Без НДС и пошлины в Чили; налоги страны назначения платит покупатель.", "出口：CFR = FOB + 运费（不含保险）。在智利免增值税、无关税；目的国税费由买方支付。", "輸出：CFR = FOB + 運賃（保険なし）。チリでは付加価値税免除・関税なし。仕向国の税金は買主が負担します。"],
+  "2. Costo de exportación": ["2. Export cost", "2. Стоимость экспорта", "2. 出口成本", "2. 輸出費用"],
+  "Calcular costo de exportación": ["Calculate export cost", "Рассчитать стоимость экспорта", "计算出口成本", "輸出費用を計算"],
+  "Precio CFR (FOB + flete)": ["CFR price (FOB + freight)", "Цена CFR (FOB + фрахт)", "CFR价格（FOB + 运费）", "CFR価格（FOB + 運賃）"],
+  "Exento (exportación)": ["Exempt (export)", "Освобождено (экспорт)", "免税（出口）", "免税（輸出）"],
+  "Sin valor de la carga: el total incluye solo el flete y los costos locales. El precio CFR se calcula cuando se informa el valor.": ["Without cargo value: the total includes only freight and local costs. The CFR price is calculated when the value is entered.", "Без стоимости груза: итог включает только фрахт и местные расходы. Цена CFR рассчитывается, когда указана стоимость.", "未填货值：总额仅含运费和当地费用。填写货值后计算CFR价格。", "貨物価格なし：合計は運賃と現地費用のみです。価格を入力するとCFR価格を計算します。"],
+  "Operación": ["Operation", "Операция", "业务", "取引"],
+  "Todas": ["All", "Все", "全部", "すべて"],
+  "Importación y exportación": ["Import and export", "Импорт и экспорт", "进口和出口", "輸入と輸出"],
 };
 
 const languageIndexes = { en: 0, ru: 1, zh: 2, ja: 3 };

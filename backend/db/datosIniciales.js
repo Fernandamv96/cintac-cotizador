@@ -44,6 +44,42 @@ export const TARIFAS_REFERENCIA = [
   ["Singapur", "Valparaiso", 1900, 3150, 2650, 4250, 34, 42, "Transbordo", "Estimado referencial 2026"],
 ];
 
+// ------------------------------------------------------------------ exportaciones
+// Cintac también exporta desde Chile (por ejemplo, a Perú, donde tiene operaciones).
+// Una ruta es de exportación cuando su puerto de origen está en Chile; no se guarda
+// aparte porque se deduce del país del puerto (3FN).
+// IMPORTANTE: tarifas ESTIMADAS para la demostración; Comex debe reemplazarlas por las
+// reales desde "Tarifas". Por eso la fuente dice "confirmar con Comex".
+export const PAIS_LOCAL = "Chile";
+
+export const PUERTOS_ORIGEN_EXPORTACION = [
+  { nombre: "San Antonio", pais: "Chile" },
+  { nombre: "Valparaiso", pais: "Chile" },
+];
+
+export const PUERTOS_DESTINO_EXPORTACION = [
+  { nombre: "Callao", pais: "Perú" },
+  { nombre: "Guayaquil", pais: "Ecuador" },
+  { nombre: "Buenaventura", pais: "Colombia" },
+  { nombre: "Manzanillo", pais: "México" },
+  { nombre: "Santos", pais: "Brasil" },
+];
+
+const FUENTE_EXPORTACION = "Estimado referencial 2026, confirmar con Comex";
+// Mismo formato que TARIFAS_REFERENCIA.
+export const TARIFAS_EXPORTACION = [
+  ["San Antonio", "Callao", 600, 1100, 900, 1600, 4, 7, "Directo", FUENTE_EXPORTACION],
+  ["Valparaiso", "Callao", 650, 1150, 950, 1650, 4, 8, "Directo", FUENTE_EXPORTACION],
+  ["San Antonio", "Guayaquil", 800, 1400, 1200, 2000, 7, 11, "Directo / Transbordo", FUENTE_EXPORTACION],
+  ["Valparaiso", "Guayaquil", 850, 1450, 1250, 2050, 8, 12, "Directo / Transbordo", FUENTE_EXPORTACION],
+  ["San Antonio", "Buenaventura", 900, 1500, 1300, 2200, 9, 14, "Transbordo", FUENTE_EXPORTACION],
+  ["Valparaiso", "Buenaventura", 950, 1550, 1350, 2250, 10, 15, "Transbordo", FUENTE_EXPORTACION],
+  ["San Antonio", "Manzanillo", 1400, 2400, 2000, 3200, 14, 20, "Transbordo", FUENTE_EXPORTACION],
+  ["Valparaiso", "Manzanillo", 1450, 2450, 2050, 3250, 15, 21, "Transbordo", FUENTE_EXPORTACION],
+  ["San Antonio", "Santos", 1500, 2600, 2200, 3600, 18, 28, "Transbordo", FUENTE_EXPORTACION],
+  ["Valparaiso", "Santos", 1550, 2650, 2250, 3650, 19, 29, "Transbordo", FUENTE_EXPORTACION],
+];
+
 // Reglas entregadas por Comex (reunión de levantamiento, septiembre 2026).
 export const PARAMETROS = [
   { nombre: "iva", valor: 0.19, descripcion: "IVA de importación (19 %), se aplica sobre CIF + arancel" },

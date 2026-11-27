@@ -3,8 +3,12 @@ import { SCHEMA_SQL } from "../db/schema.js";
 import {
   EMBARCADORES,
   PARAMETROS,
+  PAIS_LOCAL,
   PUERTOS_DESTINO,
+  PUERTOS_DESTINO_EXPORTACION,
   PUERTOS_ORIGEN,
+  PUERTOS_ORIGEN_EXPORTACION,
+  TARIFAS_EXPORTACION,
   TARIFAS_REFERENCIA,
 } from "../db/datosIniciales.js";
 
@@ -54,44 +58,60 @@ export async function transaccion(funcion) {
   }
 }
 
+async function insertarPuertos(cliente, puertos, tipo) {
+  for (const puerto of puertos) {
+    await cliente.query(
+      "INSERT INTO puertos (nombre, pais, tipo) VALUES ($1, $2, $3) ON CONFLICT (nombre, tipo) DO NOTHING",
+      [puerto.nombre, puerto.pais, tipo]
+    );
+  }
+}
+
+// Crea rutas y tarifas (una por embarcador y contenedor). Nunca pisa una tarifa que
+// ya exista: si Comex la modificó desde "Tarifas", se respeta su valor.
+async function insertarTarifas(cliente, lista) {
+  for (const [origen, destino, v20min, v20max, v40min, v40max, tmin, tmax, tipoRuta, fuente] of lista) {
+    const ruta = await cliente.query(
+      `INSERT INTO rutas (puerto_origen_id, puerto_destino_id, tipo_ruta)
+       SELECT o.id, d.id, $3 FROM puertos o, puertos d
+       WHERE o.nombre = $1 AND o.tipo = 'origen' AND d.nombre = $2 AND d.tipo = 'destino'
+       ON CONFLICT (puerto_origen_id, puerto_destino_id) DO UPDATE SET tipo_ruta = rutas.tipo_ruta
+       RETURNING id`,
+      [origen, destino, tipoRuta]
+    );
+    const rutaId = ruta.rows[0].id;
+    for (const [tipo, minimo, maximo] of [["20", v20min, v20max], ["40", v40min, v40max]]) {
+      await cliente.query(
+        `INSERT INTO tarifas (ruta_id, embarcador_id, tipo_contenedor, tarifa_min_usd, tarifa_max_usd,
+                              transito_min_dias, transito_max_dias, fuente)
+         SELECT $1, e.id, $2, $3, $4, $5, $6, $7 FROM embarcadores e
+         ON CONFLICT (ruta_id, embarcador_id, tipo_contenedor) DO NOTHING`,
+        [rutaId, tipo, minimo, maximo, tmin, tmax, `${fuente} (referencial)`]
+      );
+    }
+  }
+}
+
 async function cargarDatosIniciales(cliente) {
   const { rows } = await cliente.query("SELECT count(*)::int AS n FROM tarifas");
   if (rows[0].n === 0) {
     for (const nombre of EMBARCADORES) {
       await cliente.query("INSERT INTO embarcadores (nombre) VALUES ($1) ON CONFLICT (nombre) DO NOTHING", [nombre]);
     }
-    for (const puerto of PUERTOS_ORIGEN) {
-      await cliente.query(
-        "INSERT INTO puertos (nombre, pais, tipo) VALUES ($1, $2, 'origen') ON CONFLICT (nombre, tipo) DO NOTHING",
-        [puerto.nombre, puerto.pais]
-      );
-    }
-    for (const puerto of PUERTOS_DESTINO) {
-      await cliente.query(
-        "INSERT INTO puertos (nombre, pais, tipo) VALUES ($1, $2, 'destino') ON CONFLICT (nombre, tipo) DO NOTHING",
-        [puerto.nombre, puerto.pais]
-      );
-    }
-    for (const [origen, destino, v20min, v20max, v40min, v40max, tmin, tmax, tipoRuta, fuente] of TARIFAS_REFERENCIA) {
-      const ruta = await cliente.query(
-        `INSERT INTO rutas (puerto_origen_id, puerto_destino_id, tipo_ruta)
-         SELECT o.id, d.id, $3 FROM puertos o, puertos d
-         WHERE o.nombre = $1 AND o.tipo = 'origen' AND d.nombre = $2 AND d.tipo = 'destino'
-         ON CONFLICT (puerto_origen_id, puerto_destino_id) DO UPDATE SET tipo_ruta = EXCLUDED.tipo_ruta
-         RETURNING id`,
-        [origen, destino, tipoRuta]
-      );
-      const rutaId = ruta.rows[0].id;
-      for (const [tipo, minimo, maximo] of [["20", v20min, v20max], ["40", v40min, v40max]]) {
-        await cliente.query(
-          `INSERT INTO tarifas (ruta_id, embarcador_id, tipo_contenedor, tarifa_min_usd, tarifa_max_usd,
-                                transito_min_dias, transito_max_dias, fuente)
-           SELECT $1, e.id, $2, $3, $4, $5, $6, $7 FROM embarcadores e
-           ON CONFLICT (ruta_id, embarcador_id, tipo_contenedor) DO NOTHING`,
-          [rutaId, tipo, minimo, maximo, tmin, tmax, `${fuente} (referencial)`]
-        );
-      }
-    }
+    await insertarPuertos(cliente, PUERTOS_ORIGEN, "origen");
+    await insertarPuertos(cliente, PUERTOS_DESTINO, "destino");
+    await insertarTarifas(cliente, TARIFAS_REFERENCIA);
+  }
+  // Exportaciones (Evaluación 4): se agregan también a una base que ya estaba en uso,
+  // una sola vez, cuando todavía no existe ninguna ruta que salga de Chile.
+  const exportacion = await cliente.query(
+    `SELECT count(*)::int AS n FROM rutas r JOIN puertos o ON o.id = r.puerto_origen_id WHERE o.pais = $1`,
+    [PAIS_LOCAL]
+  );
+  if (exportacion.rows[0].n === 0) {
+    await insertarPuertos(cliente, PUERTOS_ORIGEN_EXPORTACION, "origen");
+    await insertarPuertos(cliente, PUERTOS_DESTINO_EXPORTACION, "destino");
+    await insertarTarifas(cliente, TARIFAS_EXPORTACION);
   }
   for (const parametro of PARAMETROS) {
     await cliente.query(

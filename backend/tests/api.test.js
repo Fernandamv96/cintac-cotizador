@@ -264,6 +264,66 @@ test("IT-18 sin valor de la carga la cotización se calcula solo con flete y cos
   assert.equal(c.costoTotalMinCLP, Math.round(c.totalMinUSD * c.tipoCambioUsado));
 });
 
+test("IT-19 catálogo de exportación: sale de Chile hacia 5 países y se marca la operación", { skip: omitir }, async () => {
+  const token = await iniciarSesion(ADMIN);
+  const { datos } = await llamar("/cotizaciones/catalogo", { token });
+  assert.deepEqual(datos.operaciones.exportacion.origenesPorPais, [{ pais: "Chile", puertos: ["San Antonio", "Valparaiso"] }]);
+  assert.deepEqual(
+    datos.operaciones.exportacion.destinosPorPais.map((g) => g.pais),
+    ["Brasil", "Colombia", "Ecuador", "México", "Perú"]
+  );
+  // La importación no cambia: llega a Chile desde Asia.
+  assert.deepEqual(datos.operaciones.importacion.destinosPorPais, [{ pais: "Chile", puertos: ["San Antonio", "Valparaiso"] }]);
+  const tarifas = await llamar("/tarifas", { token });
+  const callao = tarifas.datos.tarifas.find((t) => t.puertoDestino === "Callao");
+  assert.equal(callao.operacion, "exportacion");
+  assert.equal(tarifas.datos.tarifas.find((t) => t.puertoOrigen === "Shanghai").operacion, "importacion");
+});
+
+test("IT-21 semilla de exportación: se agrega una vez a una base en uso sin tocar tarifas existentes", { skip: omitir }, async () => {
+  const chile = "(SELECT r.id FROM rutas r JOIN puertos o ON o.id = r.puerto_origen_id WHERE o.pais = 'Chile')";
+  // Base "como estaba en la Evaluación 3": sin rutas de exportación y con una tarifa modificada por Comex.
+  await db.query(`DELETE FROM rutas WHERE id IN ${chile}`);
+  await db.query("UPDATE tarifas SET tarifa_min_usd = 1111, tarifa_max_usd = 2222 WHERE id = (SELECT min(id) FROM tarifas)");
+  await db.cerrarConexiones();
+  await db.asegurarBaseDeDatos();
+  const contar = async () => (await db.query(`SELECT count(*)::int AS n FROM tarifas WHERE ruta_id IN ${chile}`)).rows[0].n;
+  assert.equal(await contar(), 10 * 3 * 2); // 10 rutas × 3 embarcadores × 2 contenedores
+  const modificada = await db.query("SELECT tarifa_min_usd FROM tarifas WHERE id = (SELECT min(id) FROM tarifas)");
+  assert.equal(modificada.rows[0].tarifa_min_usd, 1111);
+  // Volver a preparar la base no duplica nada.
+  await db.cerrarConexiones();
+  await db.asegurarBaseDeDatos();
+  assert.equal(await contar(), 60);
+});
+
+test("IT-20 exportación San Antonio → Callao: se calcula sin IVA ni arancel y se filtra en el historial", { skip: omitir }, async () => {
+  const token = await iniciarSesion(ADMIN);
+  const comparacion = await llamar("/cotizaciones/tarifa?puertoOrigen=San%20Antonio&puertoDestino=Callao&cantidad=30000", { token });
+  assert.equal(comparacion.status, 200);
+  assert.equal(comparacion.datos.opciones.length, 6);
+  const creada = await llamar("/cotizaciones", {
+    metodo: "POST", token,
+    cuerpo: { proveedor: "Segucargo", puertoOrigen: "San Antonio", puertoDestino: "Callao", cantidad: 30000,
+              tipoContenedor: "40", precioFOB: 50000, otrosGastos: 200 },
+  });
+  assert.equal(creada.status, 201);
+  assert.equal(creada.datos.operacion, "exportacion");
+  assert.equal(creada.datos.cantidadContenedores, 2);
+  const { datos } = await llamar(`/cotizaciones/${creada.datos._id}/calcular`, { metodo: "POST", token });
+  const c = datos.cotizacion;
+  assert.equal(c.operacion, "exportacion");
+  assert.equal(c.ivaMinUSD, 0);
+  assert.equal(c.arancelMinUSD, 0);
+  assert.equal(c.cifMinUSD, 50000 + 2 * 900); // precio CFR
+  assert.equal(c.totalMinUSD, 50000 + 1800 + 200);
+  const soloExportaciones = await llamar("/cotizaciones?operacion=exportacion", { token });
+  assert.ok(soloExportaciones.datos.length >= 1);
+  assert.ok(soloExportaciones.datos.every((x) => x.operacion === "exportacion"));
+  const soloImportaciones = await llamar("/cotizaciones?operacion=importacion", { token });
+  assert.ok(soloImportaciones.datos.every((x) => x.operacion === "importacion"));
+});
+
 test("IT-15 fuerza bruta: el inicio de sesión se bloquea tras 20 intentos en 15 minutos", { skip: omitir }, async () => {
   let bloqueado = null;
   for (let i = 1; i <= 25 && !bloqueado; i += 1) {

@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { calcularCostoImportacion } from "../utils/calculoCosto.js";
+import { calcularCostoOperacion } from "../utils/calculoCosto.js";
 import { registrarAuditoria } from "../utils/auditoria.js";
 import { esAdministrador, puedeVerTodasLasCotizaciones } from "../utils/roles.js";
 import { compararEmbarcadores, obtenerEstimacionFlete } from "../utils/catalogoCotizacion.js";
@@ -36,6 +36,7 @@ export async function obtenerCatalogoCotizacion(_req, res) {
       puertosDestino: catalogo.puertosDestino,
       origenesPorPais: catalogo.origenesPorPais,
       destinosPorPais: catalogo.destinosPorPais,
+      operaciones: catalogo.operaciones,
       parametros: Object.fromEntries(parametros.map((p) => [p.nombre, p.valor])),
     });
   } catch (error) {
@@ -140,8 +141,9 @@ export async function calcularCotizacion(req, res) {
     }
 
     const [tipoCambio, parametros] = await Promise.all([obtenerTipoCambioUSD(), obtenerValoresParametros()]);
-    const resultado = calcularCostoImportacion(
+    const resultado = calcularCostoOperacion(
       {
+        operacion: cotizacion.operacion,
         valorFOB: cotizacion.valorFOB,
         moneda: cotizacion.moneda,
         costosLocales: cotizacion.costosLocales,
@@ -182,11 +184,12 @@ export async function calcularCotizacion(req, res) {
 
 export async function listarCotizaciones(req, res) {
   try {
-    const { proveedor, puertoOrigen, puertoDestino } = req.query;
+    const { proveedor, puertoOrigen, puertoDestino, operacion } = req.query;
     const filtro = {};
     if (proveedor) filtro.proveedor = String(proveedor).slice(0, 100);
     if (puertoOrigen) filtro.puertoOrigen = String(puertoOrigen).slice(0, 100);
     if (puertoDestino) filtro.puertoDestino = String(puertoDestino).slice(0, 100);
+    if (operacion === "importacion" || operacion === "exportacion") filtro.operacion = operacion;
     const creadoPor = puedeVerTodasLasCotizaciones(req.usuario.rol) ? null : req.usuario.id;
     return res.json(await listarCotizacionesDb(filtro, { creadoPor }));
   } catch (error) {
