@@ -11,6 +11,7 @@ export default function Historial() {
   const [proveedor, setProveedor] = useState("");
   const [puertoOrigen, setPuertoOrigen] = useState("");
   const [puertoDestino, setPuertoDestino] = useState("");
+  const [operacion, setOperacion] = useState("");
   const [cotizaciones, setCotizaciones] = useState([]);
   const [error, setError] = useState("");
   const [seleccionadas, setSeleccionadas] = useState([]);
@@ -19,7 +20,7 @@ export default function Historial() {
     e?.preventDefault();
     setError("");
     try {
-      const resultado = await api.listarCotizaciones({ proveedor, puertoOrigen, puertoDestino });
+      const resultado = await api.listarCotizaciones({ proveedor, puertoOrigen, puertoDestino, ...(operacion && { operacion }) });
       setCotizaciones(resultado);
     } catch (err) {
       setError(err.message);
@@ -33,7 +34,7 @@ export default function Historial() {
     }, 30000);
 
     return () => window.clearInterval(id);
-  }, [proveedor, puertoOrigen, puertoDestino]);
+  }, [proveedor, puertoOrigen, puertoDestino, operacion]);
 
   function alternarSeleccion(id) {
     setSeleccionadas((prev) =>
@@ -54,13 +55,21 @@ export default function Historial() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-6 py-10">
       <h2 className="text-2xl font-semibold">{t("Historial de cotizaciones")}</h2>
       <p className="mt-1 text-lg text-acero-claro">
         {t("Busca por proveedor o ruta para revisar cotizaciones anteriores.")}
       </p>
 
-      <form onSubmit={buscar} className="tarjeta mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <form onSubmit={buscar} className="tarjeta mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div>
+          <label htmlFor="fOperacion">{t("Operación")}</label>
+          <select id="fOperacion" value={operacion} onChange={(e) => setOperacion(e.target.value)}>
+            <option value="">{t("Todas")}</option>
+            <option value="importacion">{t("Importación")}</option>
+            <option value="exportacion">{t("Exportación")}</option>
+          </select>
+        </div>
         <div>
           <label htmlFor="fProveedor">{t("Proveedor")}</label>
           <input id="fProveedor" value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
@@ -114,6 +123,9 @@ export default function Historial() {
                   onChange={() => alternarSeleccion(c._id)}
                 />
                 <span>
+                  <span className={`mr-2 inline-block rounded px-2 py-0.5 text-xs font-semibold ${c.operacion === "exportacion" ? "bg-blue-100 text-blue-800" : "bg-naranja/15 text-acero"}`}>
+                    {c.operacion === "exportacion" ? t("Exportación") : t("Importación")}
+                  </span>
                   <strong>{c.puertoOrigen ? `${c.puertoOrigen} → ${c.puertoDestino || t("Destino pendiente")}` : c.producto || t("Cotización antigua")}</strong> — {c.proveedor}
                   <br />
                   <span className="text-sm text-acero-claro">{t("Cantidad:")} {c.cantidad} kg</span>

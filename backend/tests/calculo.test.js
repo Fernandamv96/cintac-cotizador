@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import {
   calcularContenedores,
   calcularCostoImportacion,
+  calcularCostoOperacion,
   contenedoresPorTipo,
   estimarFlete,
 } from "../utils/calculoCosto.js";
@@ -137,4 +138,36 @@ test("CP-12 sin valor de la carga: el total es flete + costos locales, sin CIF, 
   assert.equal(r.totalMinUSD, 5100);
   assert.equal(r.totalMaxUSD, 8100);
   assert.equal(r.costoTotalCLP, Math.round(6600 * 950));
+});
+
+test("CP-13 exportación: sin IVA ni arancel; el subtotal FOB + flete es el precio CFR", () => {
+  const entrada = { operacion: "exportacion", valorFOB: 50000, moneda: "USD", costosLocales: 200, pesoKg: 30000,
+    fleteMinUSD: 1800, fleteMaxUSD: 3200, transitoMinDias: 4, transitoMaxDias: 7, margenDias: 0 };
+  // Aunque el arancel de importación esté en 6 %, a una exportación no se le aplica.
+  const r = calcularCostoOperacion(entrada, { iva: 0.19, arancel: 0.06 }, 950);
+  assert.equal(r.operacion, "exportacion");
+  assert.equal(r.exentoIva, true);
+  assert.equal(r.baseIncoterm, "CFR");
+  assert.equal(r.ivaPctUsado, 0);
+  assert.equal(r.arancelPctUsado, 0);
+  assert.equal(r.cifMinUSD, 51800); // FOB + flete = CFR
+  assert.equal(r.ivaMinUSD, 0);
+  assert.equal(r.totalMinUSD, 52000);
+  assert.equal(r.totalMaxUSD, 53400);
+  assert.equal(r.costoTotalMinCLP, 52000 * 950);
+});
+
+test("CP-14 importación con calcularCostoOperacion da lo mismo que el cálculo original", () => {
+  const entrada = { valorFOB: 35000, moneda: "USD", costosLocales: 0, pesoKg: 50000,
+    fleteMinUSD: 4700, fleteMaxUSD: 7700, transitoMinDias: 26, transitoMaxDias: 34, margenDias: 0 };
+  const original = calcularCostoImportacion(entrada, PARAMS, 950);
+  const r = calcularCostoOperacion({ ...entrada, operacion: "importacion" }, PARAMS, 950);
+  assert.equal(r.operacion, "importacion");
+  assert.equal(r.baseIncoterm, "CIF");
+  assert.equal(r.exentoIva, false);
+  for (const campo of ["cifMinUSD", "ivaMinUSD", "totalMinUSD", "totalMaxUSD", "costoTotalCLP"]) {
+    assert.equal(r[campo], original[campo], campo);
+  }
+  // Un valor desconocido se trata como importación (la regla más conservadora: con IVA).
+  assert.equal(calcularCostoOperacion({ ...entrada, operacion: "otra" }, PARAMS, 950).operacion, "importacion");
 });

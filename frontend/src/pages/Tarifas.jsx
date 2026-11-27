@@ -18,7 +18,7 @@ const ORDEN_PARAMETROS = Object.keys(NOMBRES_PARAMETROS);
 export default function Tarifas() {
   const { language, t } = useLanguage();
   const [datos, setDatos] = useState(null);
-  const [filtro, setFiltro] = useState({ puertoOrigen: "", puertoDestino: "" });
+  const [filtro, setFiltro] = useState({ operacion: "", puertoOrigen: "", puertoDestino: "" });
   const [edicion, setEdicion] = useState({});
   const [parametros, setParametros] = useState({});
   const [nuevoEmbarcador, setNuevoEmbarcador] = useState("");
@@ -44,11 +44,24 @@ export default function Tarifas() {
     () =>
       (datos?.tarifas || []).filter(
         (tarifa) =>
+          (!filtro.operacion || tarifa.operacion === filtro.operacion) &&
           (!filtro.puertoOrigen || tarifa.puertoOrigen === filtro.puertoOrigen) &&
           (!filtro.puertoDestino || tarifa.puertoDestino === filtro.puertoDestino)
       ),
     [datos, filtro]
   );
+
+  // Puertos del filtro según la operación elegida (o de ambas).
+  function gruposPuertos(campo) {
+    const operaciones = datos?.operaciones;
+    if (!operaciones) return datos?.[campo];
+    if (filtro.operacion) return operaciones[filtro.operacion][campo];
+    const unidos = new Map();
+    for (const grupo of [...operaciones.importacion[campo], ...operaciones.exportacion[campo]]) {
+      unidos.set(grupo.pais, [...new Set([...(unidos.get(grupo.pais) || []), ...grupo.puertos])]);
+    }
+    return [...unidos].map(([pais, puertos]) => ({ pais, puertos })).sort((a, b) => a.pais.localeCompare(b.pais));
+  }
 
   function avisar(texto) {
     setMensaje(texto);
@@ -166,14 +179,20 @@ export default function Tarifas() {
 
       <section className="tarjeta mt-6">
         <h3 className="text-lg">{t("Tarifas por ruta, embarcador y contenedor (US$)")}</h3>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <select aria-label={t("Operación")} value={filtro.operacion}
+            onChange={(e) => setFiltro({ operacion: e.target.value, puertoOrigen: "", puertoDestino: "" })}>
+            <option value="">{t("Importación y exportación")}</option>
+            <option value="importacion">{t("Importación")}</option>
+            <option value="exportacion">{t("Exportación")}</option>
+          </select>
           <select aria-label={t("Puerto de origen")} value={filtro.puertoOrigen} onChange={(e) => setFiltro((f) => ({ ...f, puertoOrigen: e.target.value }))}>
             <option value="">{t("Todos los orígenes")}</option>
-            <OpcionesPuertos grupos={datos?.origenesPorPais} />
+            <OpcionesPuertos grupos={gruposPuertos("origenesPorPais")} />
           </select>
           <select aria-label={t("Puerto de destino")} value={filtro.puertoDestino} onChange={(e) => setFiltro((f) => ({ ...f, puertoDestino: e.target.value }))}>
             <option value="">{t("Todos los destinos")}</option>
-            <OpcionesPuertos grupos={datos?.destinosPorPais} />
+            <OpcionesPuertos grupos={gruposPuertos("destinosPorPais")} />
           </select>
         </div>
         <div className="mt-4 overflow-x-auto">
@@ -195,7 +214,10 @@ export default function Tarifas() {
             <tbody>
               {tarifasVisibles.map((tarifa) => (
                 <tr key={tarifa.id} className={`border-b border-acero-claro/15 ${edicion[tarifa.id] ? "bg-naranja/10" : ""}`}>
-                  <td className="py-1 pr-2">{tarifa.puertoOrigen} → {tarifa.puertoDestino}</td>
+                  <td className="py-1 pr-2">
+                    {tarifa.puertoOrigen} → {tarifa.puertoDestino}
+                    {tarifa.operacion === "exportacion" && <span className="ml-1 rounded bg-blue-100 px-1 text-xs text-blue-800">{t("Exportación")}</span>}
+                  </td>
                   <td className="py-1 pr-2">{tarifa.embarcador}</td>
                   <td className="py-1 pr-2">{tarifa.tipoContenedor}'</td>
                   <td className="py-1 pr-2"><input className="!w-24" type="number" min="0" aria-label={t("Mínimo")} value={valorEditado(tarifa, "tarifaMinUSD")} onChange={(e) => editar(tarifa.id, "tarifaMinUSD", e.target.value)} /></td>

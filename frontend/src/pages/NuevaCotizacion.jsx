@@ -7,6 +7,7 @@ import OpcionesPuertos from "../components/OpcionesPuertos.jsx";
 // La cantidad de contenedores la calcula el servidor con el peso y el tope de cada tipo;
 // el usuario elige embarcador y contenedor (20' o 40') en la comparación.
 const CAMPOS_INICIALES = {
+  operacion: "importacion",
   proveedor: "",
   tipoContenedor: "",
   puertoOrigen: "",
@@ -98,6 +99,9 @@ export default function NuevaCotizacion() {
   }, [form.puertoOrigen, form.puertoDestino, form.cantidad, form.unidadPeso]);
 
   const actualizarCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
+  // Al cambiar entre importación y exportación cambian los puertos posibles: se limpia la ruta.
+  const cambiarOperacion = (operacion) =>
+    setForm((prev) => (prev.operacion === operacion ? prev : { ...prev, operacion, puertoOrigen: "", puertoDestino: "", proveedor: "", tipoContenedor: "" }));
   // Al cambiar de unidad se convierte lo ya escrito (50000 kg pasa a 50 t y viceversa).
   const cambiarUnidadPeso = (unidad) =>
     setForm((prev) => {
@@ -118,8 +122,9 @@ export default function NuevaCotizacion() {
     }
     setCargando(true);
     try {
+      const { operacion: _operacion, ...campos } = form; // la operación la deduce el servidor desde la ruta
       const nueva = await api.crearCotizacion({
-        ...form,
+        ...campos,
         cantidad: pesoEnKg(form),
         precioFOB: Number(form.precioFOB || 0),
         otrosGastos: Number(form.otrosGastos || 0),
@@ -165,10 +170,15 @@ export default function NuevaCotizacion() {
     setCotizacion(null);
     setAdvertencia("");
     setError("");
-    setForm((prev) => ({ ...CAMPOS_INICIALES, margenDias: String(catalogo?.parametros?.margen_contingencia_dias ?? 0), puertoOrigen: prev.puertoOrigen, puertoDestino: prev.puertoDestino, unidadPeso: prev.unidadPeso }));
+    setForm((prev) => ({ ...CAMPOS_INICIALES, margenDias: String(catalogo?.parametros?.margen_contingencia_dias ?? 0), operacion: prev.operacion, puertoOrigen: prev.puertoOrigen, puertoDestino: prev.puertoDestino, unidadPeso: prev.unidadPeso }));
   }
 
   const bloqueado = Boolean(cotizacion);
+  const esExportacion = (cotizacion?.operacion || form.operacion) === "exportacion";
+  const puertos = catalogo?.operaciones?.[form.operacion] || {
+    origenesPorPais: catalogo?.origenesPorPais,
+    destinosPorPais: catalogo?.destinosPorPais,
+  };
   const tope20 = catalogo?.parametros?.toneladas_por_contenedor_20 ?? 23;
   const tope40 = catalogo?.parametros?.toneladas_por_contenedor ?? 25;
   const ivaPct = Math.round((catalogo?.parametros?.iva ?? 0.19) * 100);
@@ -189,7 +199,7 @@ export default function NuevaCotizacion() {
     <main className="mx-auto max-w-6xl px-6 py-8">
       <h2 className="text-2xl font-semibold">{t("Nueva cotización")}</h2>
       <p className="mt-1 text-lg text-acero-claro">
-        {t("Ingresa la carga, compara los embarcadores y calcula el costo de internación.")}
+        {t("Elige si importas o exportas, ingresa la carga, compara los embarcadores y calcula el costo.")}
       </p>
 
       {error && (
@@ -202,13 +212,33 @@ export default function NuevaCotizacion() {
       <section className="tarjeta mt-6">
         <h3 className="text-lg">{t("1. Carga, ruta y embarcador")}</h3>
         <form id="form-cotizacion" onSubmit={manejarRegistro} className="mt-4 space-y-4">
+          {/* Tipo de operación: define qué puertos se pueden elegir y cómo se calcula. */}
+          <fieldset disabled={bloqueado}>
+            <legend className="mb-2 font-medium">{t("Tipo de operación")}</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ["importacion", t("Importación"), t("La carga llega a Chile desde el extranjero. Se calcula CIF, arancel e IVA.")],
+                ["exportacion", t("Exportación"), t("La carga sale de Chile al extranjero. Exenta de IVA y sin arancel: precio CFR.")],
+              ].map(([valor, titulo, detalle]) => (
+                <label key={valor}
+                  className={`flex cursor-pointer gap-3 rounded-2xl border p-4 ${form.operacion === valor ? "border-naranja bg-naranja/10" : "border-[var(--borde)]"}`}>
+                  <input className="!mt-1 !h-4 !w-4 shrink-0" type="radio" name="operacion" value={valor}
+                    checked={form.operacion === valor} onChange={() => cambiarOperacion(valor)} />
+                  <span>
+                    <span className="block font-semibold">{titulo}</span>
+                    <span className="block text-sm text-acero-claro">{detalle}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="puertoOrigen">{t("Puerto de origen")}</label>
               <select id="puertoOrigen" required disabled={bloqueado} value={form.puertoOrigen}
                 onChange={(e) => actualizarCampo("puertoOrigen", e.target.value)}>
                 <option value="">{t("Selecciona puerto de origen")}</option>
-                <OpcionesPuertos grupos={catalogo?.origenesPorPais} />
+                <OpcionesPuertos grupos={puertos.origenesPorPais} />
               </select>
             </div>
             <div>
@@ -216,7 +246,7 @@ export default function NuevaCotizacion() {
               <select id="puertoDestino" required disabled={bloqueado} value={form.puertoDestino}
                 onChange={(e) => actualizarCampo("puertoDestino", e.target.value)}>
                 <option value="">{t("Selecciona puerto de destino")}</option>
-                <OpcionesPuertos grupos={catalogo?.destinosPorPais} />
+                <OpcionesPuertos grupos={puertos.destinosPorPais} />
               </select>
             </div>
             <div>
@@ -336,7 +366,9 @@ export default function NuevaCotizacion() {
               <input id="precioFOB" type="number" min="0" step="0.01" inputMode="decimal" disabled={bloqueado}
                 value={form.precioFOB} onChange={(e) => actualizarCampo("precioFOB", e.target.value)} placeholder="Ej: 35000" />
               <p className="mt-1 text-sm text-acero-claro">
-                {t("Valor FOB de la mercadería. Si lo conoces, se usa para calcular CIF, arancel e IVA; si no, la cotización muestra el flete y los costos locales.")}
+                {esExportacion
+                  ? t("Valor FOB de venta de la mercadería. Si lo conoces, se suma el flete para obtener el precio CFR; si no, la cotización muestra el flete y los costos locales.")
+                  : t("Valor FOB de la mercadería. Si lo conoces, se usa para calcular CIF, arancel e IVA; si no, la cotización muestra el flete y los costos locales.")}
               </p>
             </div>
             <div>
@@ -352,7 +384,9 @@ export default function NuevaCotizacion() {
                 value={form.otrosGastos} onChange={(e) => actualizarCampo("otrosGastos", e.target.value)} />
             </div>
             <div className="aviso">
-              {t("Reglas de Comex: CIF = FOB + flete (sin seguro). Arancel {a} % e IVA {i} % sobre CIF + arancel. Los valores se cambian en Tarifas.", { a: arancelPct, i: ivaPct })}
+              {esExportacion
+                ? t("Exportación: CFR = FOB + flete (sin seguro). Exenta de IVA y sin arancel en Chile; los impuestos del país de destino los paga el comprador.")
+                : t("Reglas de Comex: CIF = FOB + flete (sin seguro). Arancel {a} % e IVA {i} % sobre CIF + arancel. Los valores se cambian en Tarifas.", { a: arancelPct, i: ivaPct })}
             </div>
           </div>
           {!cotizacion && (
@@ -370,13 +404,13 @@ export default function NuevaCotizacion() {
       {/* Paso 2: cálculo */}
       {cotizacion && (
         <section className="tarjeta mt-6">
-          <h3 className="text-lg">{t("2. Costo de internación")}</h3>
+          <h3 className="text-lg">{esExportacion ? t("2. Costo de exportación") : t("2. Costo de internación")}</h3>
           <p className="mt-2 text-acero-claro">
-            {cotizacion.proveedor} · {cotizacion.puertoOrigen} → {cotizacion.puertoDestino} · {cotizacion.cantidadContenedores} × {cotizacion.tipoContenedor}' · {num(cotizacion.cantidad)} kg ({num(cotizacion.cantidad / 1000, 3)} t)
+            {esExportacion ? t("Exportación") : t("Importación")} · {cotizacion.proveedor} · {cotizacion.puertoOrigen} → {cotizacion.puertoDestino} · {cotizacion.cantidadContenedores} × {cotizacion.tipoContenedor}' · {num(cotizacion.cantidad)} kg ({num(cotizacion.cantidad / 1000, 3)} t)
           </p>
           {cotizacion.estado === "en_proceso" ? (
             <button onClick={manejarCalculo} disabled={cargando} className="btn-primario mt-4">
-              {cargando ? t("Calculando...") : t("Calcular costo de importación")}
+              {cargando ? t("Calculando...") : esExportacion ? t("Calcular costo de exportación") : t("Calcular costo de importación")}
             </button>
           ) : (
             <div className="mt-4 overflow-x-auto">
@@ -394,7 +428,13 @@ export default function NuevaCotizacion() {
                       ? [t("Valor de la carga (FOB)"), usd(cotizacion.valorFOBUSD), usd(cotizacion.valorFOBUSD)]
                       : [t("Valor de la carga (FOB)"), t("No informado"), ""],
                     [t("Flete"), usd(cotizacion.tarifaFleteMinUSD), usd(cotizacion.tarifaFleteMaxUSD)],
-                    ...(conValorCarga
+                    ...(conValorCarga && esExportacion
+                      ? [
+                          [t("Precio CFR (FOB + flete)"), usd(cotizacion.cifMinUSD), usd(cotizacion.cifMaxUSD)],
+                          [t("IVA"), t("Exento (exportación)"), t("Exento (exportación)")],
+                        ]
+                      : []),
+                    ...(conValorCarga && !esExportacion
                       ? [
                           [t("CIF (FOB + flete)"), usd(cotizacion.cifMinUSD), usd(cotizacion.cifMaxUSD)],
                           [`${t("Arancel")} ${(cotizacion.arancelPctUsado * 100).toFixed(1)} %`, usd(cotizacion.arancelMinUSD), usd(cotizacion.arancelMaxUSD)],
@@ -415,7 +455,9 @@ export default function NuevaCotizacion() {
               </table>
               {!conValorCarga && (
                 <p className="aviso mt-3">
-                  {t("Sin valor de la carga: el total incluye solo el flete y los costos locales. CIF, arancel e IVA se calculan cuando se informa el valor.")}
+                  {esExportacion
+                    ? t("Sin valor de la carga: el total incluye solo el flete y los costos locales. El precio CFR se calcula cuando se informa el valor.")
+                    : t("Sin valor de la carga: el total incluye solo el flete y los costos locales. CIF, arancel e IVA se calculan cuando se informa el valor.")}
                 </p>
               )}
               <div className="mt-4 space-y-1">

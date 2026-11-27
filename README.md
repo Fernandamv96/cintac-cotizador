@@ -1,6 +1,6 @@
-# Cotizador de Importaciones — Cintac
+# Cotizador de Importaciones y Exportaciones — Cintac
 
-Cotizador web del flete de importación marítima para el área de Comercio Exterior
+Cotizador web del flete marítimo de importación y exportación para el área de Comercio Exterior
 (Comex) de Cintac. Frontend React + Vite, backend Node/Express y base de datos
 PostgreSQL en **Neon**, desplegado en **Vercel**.
 
@@ -18,10 +18,17 @@ PostgreSQL en **Neon**, desplegado en **Vercel**.
   el dólar observado (mindicador.cl, con respaldo del último valor guardado).
   El valor de la carga (FOB) es opcional: si no se conoce, la cotización muestra el
   flete y los costos locales, sin CIF, arancel ni IVA.
+- **Exportaciones**: con el selector *Importación / Exportación* se cotizan envíos que
+  salen de San Antonio o Valparaíso hacia Callao, Guayaquil, Buenaventura, Manzanillo
+  y Santos. Se calculan sin IVA (las exportaciones están exentas, DL 825 art. 12
+  letra D) ni arancel: total = FOB + flete (precio CFR) + costos locales. La operación
+  se deduce del país del puerto de origen, sin columna extra en la base (3FN).
 - Suma el margen de contingencia en días al tránsito.
 - **Tarifas**: Comex edita tarifas, embarcadores y parámetros sin tocar el código;
   cada cambio queda con usuario y fecha y en la auditoría.
-- Exporta la cotización a PDF, Excel (CSV) o Word con el desglose completo.
+- Exporta la cotización a PDF, Excel (CSV) o Word como documento formal: N° de
+  cotización, fecha de emisión y validez, datos de la operación, desglose mínimo/máximo,
+  totales en US$ y CLP, costo estimado y condiciones. Es referencial: no es boleta ni factura.
 
 ## Estructura
 
@@ -104,8 +111,8 @@ se descargan las mismas variables del proyecto.
 
 ## Pruebas
 
-- `npm test`: 12 pruebas unitarias del motor de cálculo.
-- `TEST_DATABASE_URL=postgres://... npm test`: además 18 pruebas de integración de la API contra una base
+- `npm test`: 14 pruebas unitarias del motor de cálculo (incluida la exportación).
+- `TEST_DATABASE_URL=postgres://... npm test`: además 21 pruebas de integración de la API contra una base
   de pruebas **separada** (se borra y recrea en cada ejecución; nunca uses la de producción).
 - `BASE_URL=... CLAVE=... node tests/carga.mjs`: prueba de carga con 1, 10, 25 y 50 usuarios simultáneos.
 - GitHub Actions (`.github/workflows/ci.yml`) ejecuta todo lo anterior, salvo la carga, en cada Pull Request.
@@ -117,4 +124,6 @@ Detalle de cada endpoint en [docs/API.md](docs/API.md) y forma de trabajo en [CO
 - Los tres embarcadores reales y su tarifa por ruta (hoy los tres tienen la misma
   tarifa referencial de la planilla). Se cargan desde **Tarifas**.
 - El margen de contingencia por defecto (hoy 0 días).
+- Las tarifas reales de exportación (hoy son estimadas y dicen "confirmar con Comex").
+- La validez de una cotización (el documento usa 7 días).
 - Cómo tratar la carga que no viaja en contenedor.

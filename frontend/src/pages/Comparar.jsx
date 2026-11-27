@@ -23,6 +23,7 @@ export default function Comparar() {
 
   const clp = (v) => (v ? `$${v.toLocaleString(LOCALES[language])} CLP` : t("Sin calcular"));
   const filas = [
+    { etiqueta: t("Operación"), clave: "operacion", formato: (v) => (v === "exportacion" ? t("Exportación") : t("Importación")) },
     { etiqueta: t("Embarcador"), clave: "proveedor" },
     { etiqueta: t("Peso (kg)"), clave: "cantidad", formato: (v) => Number(v || 0).toLocaleString(LOCALES[language]) },
     { etiqueta: t("Contenedores"), clave: "cantidadContenedores", formato: (v, c) => `${v} × ${c.tipoContenedor}'` },

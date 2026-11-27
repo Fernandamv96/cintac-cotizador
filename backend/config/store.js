@@ -2,6 +2,7 @@
 // Mantiene los mismos nombres de funciones que usaba el almacén en memoria del
 // prototipo, para que los controladores cambien lo menos posible.
 import { query, transaccion } from "./db.js";
+import { PAIS_LOCAL } from "../db/datosIniciales.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const esUuid = (valor) => UUID_RE.test(String(valor || ""));
@@ -234,6 +235,8 @@ function aTarifa(fila) {
     puertoOrigen: fila.puerto_origen,
     paisOrigen: fila.pais_origen,
     puertoDestino: fila.puerto_destino,
+    paisDestino: fila.pais_destino,
+    operacion: fila.operacion,
     tipoRuta: fila.tipo_ruta,
     tipoContenedor: fila.tipo_contenedor,
     tarifaMinUSD: fila.tarifa_min_usd,
@@ -247,9 +250,14 @@ function aTarifa(fila) {
   };
 }
 
+// Una ruta es de exportación cuando sale de un puerto chileno; se deduce del país del
+// puerto de origen y no se guarda aparte (evita una dependencia transitiva, 3FN).
+const OPERACION_SQL = `CASE WHEN o.pais = '${PAIS_LOCAL}' THEN 'exportacion' ELSE 'importacion' END`;
+
 const SELECT_TARIFAS = `
   SELECT t.*, e.nombre AS embarcador, e.activo AS embarcador_activo,
          o.nombre AS puerto_origen, o.pais AS pais_origen, d.nombre AS puerto_destino,
+         d.pais AS pais_destino, ${OPERACION_SQL} AS operacion,
          r.tipo_ruta, u.nombre AS modificado_por_nombre
   FROM tarifas t
   JOIN rutas r ON r.id = t.ruta_id
@@ -265,18 +273,26 @@ function agruparPorPais(puertos) {
   return [...grupos].map(([pais, nombres]) => ({ pais, puertos: nombres }));
 }
 
+// Puertos de cada operación: en importación se llega a Chile y en exportación se sale de Chile.
 export async function obtenerCatalogo() {
-  const [embarcadores, origenes, destinos] = await Promise.all([
+  const [embarcadores, puertos] = await Promise.all([
     query("SELECT id, nombre, activo FROM embarcadores ORDER BY nombre"),
-    query("SELECT nombre, pais FROM puertos WHERE tipo = 'origen' ORDER BY pais, nombre"),
-    query("SELECT nombre, pais FROM puertos WHERE tipo = 'destino' ORDER BY pais, nombre"),
+    query("SELECT nombre, pais, tipo FROM puertos ORDER BY pais, nombre"),
   ]);
+  const filtrar = (tipo, local) =>
+    puertos.rows.filter((p) => p.tipo === tipo && (p.pais === PAIS_LOCAL) === local);
+  const operaciones = {
+    importacion: { origenesPorPais: agruparPorPais(filtrar("origen", false)), destinosPorPais: agruparPorPais(filtrar("destino", true)) },
+    exportacion: { origenesPorPais: agruparPorPais(filtrar("origen", true)), destinosPorPais: agruparPorPais(filtrar("destino", false)) },
+  };
   return {
     embarcadores: embarcadores.rows,
-    puertosOrigen: origenes.rows.map((p) => p.nombre),
-    puertosDestino: destinos.rows.map((p) => p.nombre),
-    origenesPorPais: agruparPorPais(origenes.rows),
-    destinosPorPais: agruparPorPais(destinos.rows),
+    // Campos anteriores (solo importación) para no romper pantallas existentes.
+    puertosOrigen: filtrar("origen", false).map((p) => p.nombre),
+    puertosDestino: filtrar("destino", true).map((p) => p.nombre),
+    origenesPorPais: operaciones.importacion.origenesPorPais,
+    destinosPorPais: operaciones.importacion.destinosPorPais,
+    operaciones,
   };
 }
 
@@ -415,6 +431,7 @@ export async function ultimoTipoCambioGuardado() {
 
 const SELECT_COTIZACIONES = `
   SELECT c.*, e.nombre AS embarcador, o.nombre AS puerto_origen, d.nombre AS puerto_destino,
+         o.pais AS pais_origen, d.pais AS pais_destino, ${OPERACION_SQL} AS operacion,
          r.tipo_ruta, u.nombre AS creado_por_nombre, u.email AS creado_por_email
   FROM cotizaciones c
   JOIN rutas r ON r.id = c.ruta_id
@@ -433,6 +450,9 @@ function aCotizacion(fila) {
     embarcador: fila.embarcador,
     puertoOrigen: fila.puerto_origen,
     puertoDestino: fila.puerto_destino,
+    paisOrigen: fila.pais_origen,
+    paisDestino: fila.pais_destino,
+    operacion: fila.operacion,
     tipoRuta: fila.tipo_ruta,
     tipoProducto: "carga_general",
     cantidad: fila.peso_kg,
@@ -517,6 +537,8 @@ export async function listarCotizaciones(filtro = {}, { creadoPor = null, limite
   if (filtro.proveedor) agregar("e.nombre ILIKE ?", `%${filtro.proveedor}%`);
   if (filtro.puertoOrigen) agregar("o.nombre = ?", filtro.puertoOrigen);
   if (filtro.puertoDestino) agregar("d.nombre = ?", filtro.puertoDestino);
+  if (filtro.operacion === "exportacion") agregar("o.pais = ?", PAIS_LOCAL);
+  if (filtro.operacion === "importacion") agregar("o.pais <> ?", PAIS_LOCAL);
   valores.push(limite);
   const where = condiciones.length ? `WHERE ${condiciones.join(" AND ")}` : "";
   const { rows } = await query(

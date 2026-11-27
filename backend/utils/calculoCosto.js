@@ -12,6 +12,11 @@
 //     IVA, y el total queda en flete + costos locales.
 //   * Margen de contingencia en días sobre el tránsito.
 //
+//   * Exportación (Evaluación 4): la carga sale de Chile. Las exportaciones están
+//     exentas de IVA (DL 825, art. 12 letra D) y Chile no cobra arancel de salida, así
+//     que el total es FOB + flete (precio CFR) + costos locales. El arancel e IVA del
+//     país de destino los paga el importador extranjero y no se incluyen.
+//
 // Las funciones de este archivo son puras (sin base de datos ni red) para poder
 // probarlas con casos de referencia (ver tests/calculo.test.js).
 
@@ -131,5 +136,24 @@ export function calcularCostoImportacion(entrada, parametros, tipoCambio) {
     margenDias: margen,
     transitoConMargenMinDias: Number(entrada.transitoMinDias) + margen,
     transitoConMargenMaxDias: Number(entrada.transitoMaxDias) + margen,
+  };
+}
+
+export const OPERACIONES = ["importacion", "exportacion"];
+
+// Calcula según el tipo de operación. En exportación el IVA y el arancel son 0 y el
+// subtotal FOB + flete corresponde al precio CFR en lugar del CIF.
+export function calcularCostoOperacion(entrada, parametros, tipoCambio) {
+  const operacion = entrada.operacion === "exportacion" ? "exportacion" : "importacion";
+  const resultado = calcularCostoImportacion(
+    entrada,
+    operacion === "exportacion" ? { iva: 0, arancel: 0 } : parametros,
+    tipoCambio
+  );
+  return {
+    ...resultado,
+    operacion,
+    exentoIva: operacion === "exportacion",
+    baseIncoterm: operacion === "exportacion" ? "CFR" : "CIF",
   };
 }
